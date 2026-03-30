@@ -1,0 +1,48 @@
+{
+    "hosts": [
+        {
+            "name": "server",
+            "address": "192.168.1.2"
+        }
+    ],
+    "tasks": [
+        {
+            "name": "main_task",
+            "subtasks": [
+                {
+                    "name": "T1",
+                    "component": "Component1",
+                    "host": "server",
+                    "core": 1,
+                    "priority": 1
+                },
+                {
+                    "name": "T2",
+                    "component": "Component2",
+                    "host": "server",
+                    "core": 1,
+                    "priority": 1
+                },
+                {
+                    "name": "T3",
+                    "component": "Component3",
+                    "host": "server",
+                    "core": 1,
+                    "priority": 1
+                },
+                {
+                    "name": "T4",
+                    "component": "Component4",
+                    "host": "server",
+                    "core": 1,
+                    "priority": 1
+                }
+            ]
+        }
+    ],
+    "connections": [
+        { "upstream": "T1", "downstream": "T2" },
+        { "upstream": "T2", "downstream": "T3" },
+        { "upstream": "T3", "downstream": "T4" }
+    ]
+}

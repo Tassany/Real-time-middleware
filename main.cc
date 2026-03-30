@@ -1,4 +1,5 @@
 #include <iostream>
+#include "parser_json.hpp"
 #include "component.hpp"
 #include "adapter.hpp"
 
@@ -31,6 +32,10 @@ int double_to_int(const double & value) {
 }
 
 int main() {
+
+    JsonParser parser;
+    DeploymentPlan plan = parser.parse("deployment_plan.json");
+
     config_t cfg;
     cfg.task_id = 1;
     cfg.core_id = 0;
@@ -51,5 +56,35 @@ int main() {
     compB.execute();
 
     std::cout  << compA.output_ << " " << compB.output_ << std::endl;
+
+    std::cout << "=== HOSTS ===" << std::endl;
+    for (const auto& host : plan.hosts) {
+        std::cout << host.name 
+                  << " - " 
+                  << host.address << std::endl;
+    }
+
+    // 3. verificando tasks e subtasks
+    std::cout << "\n=== TASKS ===" << std::endl;
+    for (const auto& task : plan.tasks) {
+        std::cout << "task: " << task.name << std::endl;
+        for (const auto& subtask : task.subtasks) {
+            std::cout << "  subtask: "   << subtask.name
+                      << " | component: " << subtask.component
+                      << " | host: "      << subtask.host
+                      << " | core: "      << subtask.core
+                      << " | priority: "  << subtask.priority
+                      << std::endl;
+        }
+    }
+
+    // 4. verificando conexoes
+    std::cout << "\n=== CONEXOES ===" << std::endl;
+    for (const auto& conn : plan.connections) {
+        std::cout << conn.upstream
+                  << " --> "
+                  << conn.downstream
+                  << std::endl;
+    }
     return 0;
 }
