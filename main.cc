@@ -3,7 +3,6 @@
 #include "component.hpp"
 #include "adapter.hpp"
 
-
 struct config_t {
     int         task_id  = 0;
     int         core_id     = 0;
@@ -64,7 +63,6 @@ int main() {
                   << host.address << std::endl;
     }
 
-    // 3. verificando tasks e subtasks
     std::cout << "\n=== TASKS ===" << std::endl;
     for (const auto& task : plan.tasks) {
         std::cout << "task: " << task.name << std::endl;
@@ -77,9 +75,7 @@ int main() {
                       << std::endl;
         }
     }
-
-    // 4. verificando conexoes
-    std::cout << "\n=== CONEXOES ===" << std::endl;
+    std::cout << "\n=== CONNECTIONS ===" << std::endl;
     for (const auto& conn : plan.connections) {
         std::cout << conn.upstream
                   << " --> "

@@ -11,3 +11,11 @@ curl -L https://github.com/nlohmann/json/releases/latest/download/json.hpp \
 
 make       
 make clean 
+
+## TO-DO
+
+[] DAG
+[] Team Manager 
+[] Ring buffer
+[] Dispatcher 
+[] Threads and use of cores

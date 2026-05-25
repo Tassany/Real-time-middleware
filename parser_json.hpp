@@ -14,9 +14,7 @@
 class JsonParser {
 public:
     DeploymentPlan parse(const std::string& filename);
-
 private:
-
     std::vector<HostInfo>       parse_hosts(const nlohmann::json& j);
     std::vector<TaskInfo>       parse_tasks(const nlohmann::json& j);
     std::vector<SubtaskInfo>    parse_subtasks(const nlohmann::json& j);
