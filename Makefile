@@ -1,15 +1,43 @@
 CXX      = g++
 CXXFLAGS = -std=c++17 -Wall -Iinclude
 
+EXAMPLES_DIR = examples
+
+# -----------------------------------------------------------------------
+#  Main binary (main.cc)
+# -----------------------------------------------------------------------
 TARGET = main
-SRCS   = main.cc parser_json.cpp
-HDRS   = component.hpp adapter.hpp dag.hpp dispacher.hpp \
-         deployment_plan.hpp parser_json.hpp
+SRCS   = main.cc parser_json.cpp dag.cpp
+HDRS   = component.hpp adapter.hpp dag.hpp dispatcher.hpp \
+         deployment_plan.hpp parser_json.hpp ring_buffer.hpp
 
 $(TARGET): $(SRCS) $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(SRCS)
 
-clean:
-	rm -f $(TARGET)
+# -----------------------------------------------------------------------
+#  Examples
+#  -I. : allows examples to include headers from the project root
+#  -pthread : required for POSIX threads (affinity, scheduling, etc.)
+#  Run example_dispatcher with sudo to enable SCHED_FIFO real-time priority
+# -----------------------------------------------------------------------
+example_ring: $(EXAMPLES_DIR)/example_ring.cpp ring_buffer.hpp
+	$(CXX) $(CXXFLAGS) -I. -o $@ $<
 
-.PHONY: clean
+example_eventfd: $(EXAMPLES_DIR)/example_eventfd.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+example_two_threads: $(EXAMPLES_DIR)/example_two_threads.cpp ring_buffer.hpp
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $<
+
+example_dispatcher: $(EXAMPLES_DIR)/example_dispatcher.cpp dispatcher.hpp ring_buffer.hpp
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $<
+
+example_epoll: $(EXAMPLES_DIR)/example_epoll.cpp
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
+
+examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll
+
+clean:
+	rm -f $(TARGET) example_ring example_eventfd example_two_threads example_dispatcher example_epoll
+
+.PHONY: clean examples
