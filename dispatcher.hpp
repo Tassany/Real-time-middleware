@@ -56,8 +56,8 @@ struct Subtask {
  * After calling start(), subtasks are submitted via notify() from any thread.
  * Call stop() (or let the destructor do it) to drain the queue and join the thread.
  *
- * @note Requires CAP_SYS_NICE or root privileges to apply SCHED_FIFO priority.
- *       Without them the thread still runs, but without real-time guarantees.
+ * @note Requires root privileges to apply SCHED_FIFO priority.
+ *       Without the thread still runs, but without real-time guarantees.
  */
 class Dispatcher {
 public:

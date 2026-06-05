@@ -50,6 +50,8 @@ std::vector<SubtaskInfo> JsonParser::parse_subtasks(const json& j) {
         subtask.host      = s["host"];
         subtask.core      = s["core"];
         subtask.priority  = s["priority"];
+        subtask.period_ns   = s.value("period_ns",   0L);
+        subtask.deadline_ns = s.value("deadline_ns", 0L);
         subtasks.push_back(subtask);
     }
     return subtasks;

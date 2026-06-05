@@ -1,41 +1,46 @@
 {
     "hosts": [
-        {
-            "name": "server",
-            "address": "192.168.1.2"
-        }
+        { "name": "server", "address": "192.168.1.2" }
     ],
     "tasks": [
         {
             "name": "main_task",
             "subtasks": [
                 {
-                    "name": "T1",
+                    "name":      "T1",
                     "component": "Component1",
-                    "host": "server",
-                    "core": 1,
-                    "priority": 1
+                    "host":      "server",
+                    "core":      0,
+                    "priority":  50,
+                    "period_ns": 5000000,
+                    "deadline_ns": 5000000
                 },
                 {
-                    "name": "T2",
+                    "name":      "T2",
                     "component": "Component2",
-                    "host": "server",
-                    "core": 1,
-                    "priority": 1
+                    "host":      "server",
+                    "core":      1,
+                    "priority":  49,
+                    "period_ns": 5000000,
+                    "deadline_ns": 5000000
                 },
                 {
-                    "name": "T3",
+                    "name":      "T3",
                     "component": "Component3",
-                    "host": "server",
-                    "core": 1,
-                    "priority": 1
+                    "host":      "server",
+                    "core":      2,
+                    "priority":  48,
+                    "period_ns": 5000000,
+                    "deadline_ns": 5000000
                 },
                 {
-                    "name": "T4",
+                    "name":      "T4",
                     "component": "Component4",
-                    "host": "server",
-                    "core": 1,
-                    "priority": 1
+                    "host":      "server",
+                    "core":      3,
+                    "priority":  47,
+                    "period_ns": 5000000,
+                    "deadline_ns": 5000000
                 }
             ]
         }

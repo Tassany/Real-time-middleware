@@ -8,14 +8,20 @@ mkdir -p include/nlohmann
 curl -L https://github.com/nlohmann/json/releases/latest/download/json.hpp \
      -o include/nlohmann/json.hpp
 
+## Compile and execute the tests:
+  make                   
+  make examples           
+  make example_dispatcher 
+  make clean             
+  
 
-make       
-make clean 
+## Run
+  ./main
 
-## TO-DO
+## Exemplos
+  ./example_ring
+  ./example_eventfd
+  ./example_two_threads
+  ./example_epoll
+   sudo ./example_dispatcher
 
-[] DAG
-[] Team Manager 
-[] Ring buffer
-[] Dispatcher 
-[] Threads and use of cores
