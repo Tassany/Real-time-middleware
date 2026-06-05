@@ -13,20 +13,22 @@ struct HostInfo {
 
 
 struct SubtaskInfo {
-    std::string name;         
-    std::string component;    
+    int        id;      
+    std::string component_type;    
     std::string host;         
     int         core;         
-    int         priority;   
+    int         priority;  
+    uint64_t    period_ns;
+    uint64_t    deadline_ns; 
 };
 
 struct ConnectionInfo {
-    std::string upstream;   
-    std::string downstream; 
+    int upstream;   
+    int downstream; 
 };
 
 struct TaskInfo {
-    std::string             name;
+    int id;
     std::vector<SubtaskInfo> subtasks;
 };
 

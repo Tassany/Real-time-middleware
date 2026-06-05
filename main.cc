@@ -65,13 +65,15 @@ int main() {
 
     std::cout << "\n=== TASKS ===" << std::endl;
     for (const auto& task : plan.tasks) {
-        std::cout << "task: " << task.name << std::endl;
+        std::cout << "task id: " << task.id << std::endl;
         for (const auto& subtask : task.subtasks) {
-            std::cout << "  subtask: "   << subtask.name
-                      << " | component: " << subtask.component
-                      << " | host: "      << subtask.host
-                      << " | core: "      << subtask.core
-                      << " | priority: "  << subtask.priority
+            std::cout << "  subtask id: "    << subtask.id
+                      << " | component: "    << subtask.component_type
+                      << " | host: "         << subtask.host
+                      << " | core: "         << subtask.core
+                      << " | priority: "     << subtask.priority
+                      << " | period_ns: "    << subtask.period_ns
+                      << " | deadline_ns: "  << subtask.deadline_ns
                       << std::endl;
         }
     }

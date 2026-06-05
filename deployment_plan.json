@@ -7,42 +7,50 @@
     ],
     "tasks": [
         {
-            "name": "main_task",
+            "id": 1,
             "subtasks": [
                 {
-                    "name": "T1",
-                    "component": "Component1",
+                    "id": 1,
+                    "component_type": "source",
                     "host": "server",
                     "core": 1,
-                    "priority": 1
+                    "priority": 1,
+                    "period_ns": 100000000,   
+                    "deadline_ns": 100000000  
                 },
                 {
-                    "name": "T2",
-                    "component": "Component2",
+                    "id": 2,
+                    "component_type": "intermediate",
                     "host": "server",
                     "core": 1,
-                    "priority": 1
+                    "priority": 1,
+                    "period_ns": 200000000,  
+                    "deadline_ns": 200000000  
                 },
                 {
-                    "name": "T3",
-                    "component": "Component3",
+                    "id": 3,
+                    "component_type": "intermediate",
                     "host": "server",
                     "core": 1,
-                    "priority": 1
+                    "priority": 1,
+                    "period_ns": 300000000,   
+                    "deadline_ns": 300000000 
                 },
                 {
-                    "name": "T4",
-                    "component": "Component4",
+                    "id": 4,
+                    "component_type": "sink",
                     "host": "server",
                     "core": 1,
-                    "priority": 1
+                    "priority": 1,
+                    "period_ns": 400000000,  
+                    "deadline_ns": 400000000 
                 }
             ]
         }
     ],
     "connections": [
-        { "upstream": "T1", "downstream": "T2" },
-        { "upstream": "T2", "downstream": "T3" },
-        { "upstream": "T3", "downstream": "T4" }
+        { "upstream": 1, "downstream": 2 },
+        { "upstream": 2, "downstream": 3 },
+        { "upstream": 3, "downstream": 4 }
     ]
 }

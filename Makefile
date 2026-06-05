@@ -37,7 +37,38 @@ example_epoll: $(EXAMPLES_DIR)/example_epoll.cpp
 
 examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll
 
-clean:
-	rm -f $(TARGET) example_ring example_eventfd example_two_threads example_dispatcher example_epoll
+# -----------------------------------------------------------------------
+#  Tests
+# -----------------------------------------------------------------------
+TESTS_DIR  = tests
+TESTS_BINS = test_parser test_dag test_ringbuf test_component test_dispatcher test_team_manager
 
-.PHONY: clean examples
+test_parser: $(TESTS_DIR)/test_parser.cpp parser_json.cpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(TESTS_DIR)/test_parser.cpp parser_json.cpp dag.cpp
+
+test_dag: $(TESTS_DIR)/test_dag.cpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(TESTS_DIR)/test_dag.cpp dag.cpp
+
+test_ringbuf: $(TESTS_DIR)/test_ringbuf.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_ringbuf.cpp
+
+test_component: $(TESTS_DIR)/test_component.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(TESTS_DIR)/test_component.cpp
+
+test_dispatcher: $(TESTS_DIR)/test_dispatcher.cpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_dispatcher.cpp dag.cpp
+
+test_team_manager: $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp
+
+test: test_parser
+	@echo "--- Fase 0: Parser ---"
+	@./test_parser
+
+tests: $(TESTS_BINS)
+
+clean:
+	rm -f $(TARGET) $(TESTS_BINS) \
+	      example_ring example_eventfd example_two_threads example_dispatcher example_epoll
+
+.PHONY: clean examples tests test
