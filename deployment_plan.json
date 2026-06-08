@@ -16,7 +16,12 @@
                     "core": 1,
                     "priority": 1,
                     "period_ns": 100000000,   
-                    "deadline_ns": 100000000  
+                    "deadline_ns": 100000000,
+                    "config": {
+                        "scale_factor": 2.5,
+                        "threshold": 100
+                    }
+
                 },
                 {
                     "id": 2,

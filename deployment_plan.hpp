@@ -4,7 +4,10 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
+#include "include/nlohmann/json.hpp"
 
+using json = nlohmann::json;
 
 struct HostInfo {
     std::string name;
@@ -19,7 +22,8 @@ struct SubtaskInfo {
     int         core;         
     int         priority;  
     uint64_t    period_ns;
-    uint64_t    deadline_ns; 
+    uint64_t    deadline_ns;
+    json        config;
 };
 
 struct ConnectionInfo {
