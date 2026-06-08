@@ -35,7 +35,10 @@ example_dispatcher: $(EXAMPLES_DIR)/example_dispatcher.cpp dispatcher.hpp ring_b
 example_epoll: $(EXAMPLES_DIR)/example_epoll.cpp
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
 
-examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll
+example_pipeline: $(EXAMPLES_DIR)/example_pipeline.cpp dispatcher.hpp ring_buffer.hpp
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $<
+
+examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline
 
 # -----------------------------------------------------------------------
 #  Tests
@@ -61,7 +64,7 @@ test_dispatcher: $(TESTS_DIR)/test_dispatcher.cpp dag.cpp $(HDRS)
 test_team_manager: $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp
 
-test: test_parser test_dag test_ringbuf test_component
+test: test_parser test_dag test_ringbuf test_component test_dispatcher
 	@echo "--- Fase 0: Parser ---"
 	@./test_parser
 	@echo "--- Fase 1: DAG ---"
@@ -70,6 +73,8 @@ test: test_parser test_dag test_ringbuf test_component
 	@./test_ringbuf
 	@echo "--- Fase 3: Component Model ---"
 	@./test_component
+	@echo "--- Fase 4: Dispatcher ---"
+	@./test_dispatcher
 
 tests: $(TESTS_BINS)
 
