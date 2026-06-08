@@ -90,6 +90,8 @@ void* consumer(void* arg) {
 
         std::cout << "         [Consumer core 1 prio 49] job " << seq
                   << "  result=" << result << "\n";
+
+        ctx->ring.release(seq);
     }
 
     return nullptr;

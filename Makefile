@@ -61,11 +61,15 @@ test_dispatcher: $(TESTS_DIR)/test_dispatcher.cpp dag.cpp $(HDRS)
 test_team_manager: $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp
 
-test: test_parser test_dag
+test: test_parser test_dag test_ringbuf test_component
 	@echo "--- Fase 0: Parser ---"
 	@./test_parser
 	@echo "--- Fase 1: DAG ---"
 	@./test_dag
+	@echo "--- Fase 2: Ring Buffer ---"
+	@./test_ringbuf
+	@echo "--- Fase 3: Component Model ---"
+	@./test_component
 
 tests: $(TESTS_BINS)
 
