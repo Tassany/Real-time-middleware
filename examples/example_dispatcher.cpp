@@ -23,10 +23,10 @@ int main() {
     // --- Define the subtasks ---
 
     Subtask supplier;
-    supplier.name = "Supplier";
+    supplier.id = 1;
 
     Subtask consumer;
-    consumer.name = "Consumer";
+    consumer.id = 2;
 
     supplier.execute = [&]() {
         double value = current_seq * 10.0;

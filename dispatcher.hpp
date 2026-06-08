@@ -2,213 +2,339 @@
 
 /**
  * @file dispatcher.hpp
- * @brief Real-time task dispatcher pinned to a specific CPU core.
  *
- * Architecture overview
- * ---------------------
- * Each Dispatcher owns a single POSIX thread pinned to one CPU core via
- * pthread_setaffinity_np().  The thread runs at a real-time SCHED_FIFO
- * priority and blocks on epoll_wait() when idle, consuming no CPU time.
+ * Implements the MCFlow dispatching subsystem (paper Section V-B, V-C).
  *
- * Wakeup mechanism
- * ----------------
- * An eventfd(EFD_SEMAPHORE) acts as a lightweight notification channel.
- * When notify() is called (from any thread), it:
- *   1. Pushes the Subtask pointer onto a mutex-protected FIFO queue.
- *   2. Writes 1 to the eventfd, which increments its counter and wakes epoll.
- *
- * The dispatcher thread drains one entry per wakeup:
- *   epoll_wait -> read(eventfd) -> dequeue subtask -> subtask.execute()
- *
- * This design avoids busy-waiting and keeps latency low while remaining
- * compatible with standard Linux real-time scheduling.
+ * Key additions over the previous version
+ * ----------------------------------------
+ * - Subtask carries period_ns / next_release_ns for periodic scheduling.
+ * - Subtask carries an atomic in_processing flag (required by leader/followers).
+ * - Subtask carries fan_in_total / fan_in_received for multi-supplier fan-in.
+ * - Subtask carries a downstream list so the dispatcher can automatically
+ *   notify successors after execution (no manual wiring in execute()).
+ * - Dispatcher owns a min-heap timer_queue_ for deferred periodic subtasks.
+ * - Dispatcher owns an idle thread (SCHED_FIFO prio 1) that drains the timer
+ *   queue when the CPU is otherwise idle.
+ * - notify() enforces the fan-in condition before enqueuing.
+ * - The 6-step release-guard protocol (Section V-C) is implemented in
+ *   process_subtask(), which is also exposed via Demultiplexer::process().
  */
 
 #include <queue>
 #include <vector>
 #include <functional>
 #include <atomic>
-#include <string>
 #include <iostream>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <unistd.h>
+#include <time.h>
 
+class Dispatcher; // forward declaration for SubtaskConn
 
-/**
- * @brief A named, executable unit of work corresponding to one DAG node.
- *
- * The execute functor can wrap any callable — a free function, a lambda,
- * or a bound member function — making Subtask decoupled from Component.
- */
-struct Subtask {
-    std::string           name;    ///< Human-readable label for logging.
-    std::function<void()> execute; ///< The actual computation to run.
+// -----------------------------------------------------------------------
+//  Downstream connection descriptor
+// -----------------------------------------------------------------------
+struct SubtaskConn {
+    Dispatcher*    dispatcher;
+    struct Subtask* subtask;
 };
 
+// -----------------------------------------------------------------------
+//  Subtask — unit of work with real-time scheduling metadata
+// -----------------------------------------------------------------------
+struct Subtask {
+    int                   id;
+    std::function<void()> execute;
 
-/**
- * @brief Executes subtasks on a dedicated real-time thread pinned to one CPU core.
- *
- * One Dispatcher is created per (core, priority) pair in the deployment plan.
- * After calling start(), subtasks are submitted via notify() from any thread.
- * Call stop() (or let the destructor do it) to drain the queue and join the thread.
- *
- * @note Requires CAP_SYS_NICE or root privileges to apply SCHED_FIFO priority.
- *       Without them the thread still runs, but without real-time guarantees.
- */
+    // Periodic scheduling: 0 = aperiodic (execute immediately every time)
+    uint64_t period_ns       = 0;
+    // Earliest absolute time (CLOCK_MONOTONIC ns) for next execution.
+    // 0 = not yet initialised → execute immediately on first notification.
+    uint64_t next_release_ns = 0;
+
+    // Prevents concurrent execution when the leader/followers pattern is used.
+    std::atomic<bool> in_processing{false};
+
+    // Fan-in: how many upstream suppliers must notify before we dispatch.
+    int              fan_in_total    = 1;  // default: single supplier
+    std::atomic<int> fan_in_received{0};
+
+    // Successors to notify automatically after this subtask finishes.
+    std::vector<SubtaskConn> downstream;
+
+    Subtask() = default;
+    Subtask(int i, std::function<void()> fn)
+        : id(i), execute(std::move(fn)) {}
+
+    // Non-copyable: atomic members cannot be copied.
+    Subtask(const Subtask&)            = delete;
+    Subtask& operator=(const Subtask&) = delete;
+};
+
+// -----------------------------------------------------------------------
+//  Timer queue support
+// -----------------------------------------------------------------------
+struct TimerEntry {
+    uint64_t release_ns;
+    Subtask* subtask;
+    bool operator>(const TimerEntry& o) const { return release_ns > o.release_ns; }
+};
+
+using TimerQueue = std::priority_queue<TimerEntry,
+                                       std::vector<TimerEntry>,
+                                       std::greater<TimerEntry>>;
+
+// -----------------------------------------------------------------------
+//  Dispatcher
+// -----------------------------------------------------------------------
 class Dispatcher {
 public:
-
-    /**
-     * @param core     CPU core index (0-based) to pin the thread to.
-     * @param priority SCHED_FIFO real-time priority (1 = lowest, 99 = highest).
-     */
     Dispatcher(int core, int priority)
-        : core_(core), priority_(priority), running_(false) {}
+        : core_(core), priority_(priority),
+          efd_(-1), epfd_(-1), idle_efd_(-1), running_(false) {}
 
-    /** @brief Calls stop() if the Dispatcher is still running. */
     ~Dispatcher() { stop(); }
 
-    /**
-     * @brief Register a subtask as eligible to run on this Dispatcher.
-     *
-     * Registration is informational at this stage; the Dispatcher does not
-     * schedule subtasks autonomously — callers trigger execution via notify().
-     *
-     * @param s Pointer to a Subtask. Must outlive the Dispatcher.
-     */
-    void register_subtask(Subtask* s) {
-        subtasks_.push_back(s);
-    }
+    void register_subtask(Subtask* s) { subtasks_.push_back(s); }
 
     /**
-     * @brief Signal that subtask @p s is ready to execute.
+     * Signal that all preconditions for subtask s are met for one job.
      *
-     * Thread-safe; may be called from any thread, including other Dispatchers.
-     * The subtask is queued and the internal thread is woken via eventfd.
-     *
-     * @param s Subtask to enqueue. Must not be nullptr.
+     * Implements fan-in: increments fan_in_received; enqueues s only when
+     * all fan_in_total suppliers have signalled for this job.
+     * Thread-safe; may be called from any thread.
      */
     void notify(Subtask* s) {
+        int received = s->fan_in_received.fetch_add(1) + 1;
+        if (received < s->fan_in_total) return;  // still waiting for more suppliers
+        s->fan_in_received.store(0);              // reset for the next job
+
         pthread_mutex_lock(&queue_mutex_);
         queue_.push(s);
         pthread_mutex_unlock(&queue_mutex_);
 
-        // Increment the eventfd semaphore to wake up epoll_wait in loop().
-        uint64_t signal = 1;
-        write(efd_, &signal, sizeof(signal));
+        uint64_t sig = 1;
+        ::write(efd_, &sig, sizeof(sig));
     }
 
-    /**
-     * @brief Create the eventfd/epoll descriptors and launch the worker thread.
-     *
-     * Must be called exactly once before any notify() calls.
-     */
     void start() {
-        efd_  = eventfd(0, EFD_SEMAPHORE);
-        epfd_ = epoll_create1(0);
+        efd_      = eventfd(0, EFD_SEMAPHORE);
+        epfd_     = epoll_create1(0);
+        idle_efd_ = eventfd(0, EFD_SEMAPHORE);
 
-        struct epoll_event ev;
+        struct epoll_event ev{};
         ev.events  = EPOLLIN;
         ev.data.fd = efd_;
         epoll_ctl(epfd_, EPOLL_CTL_ADD, efd_, &ev);
 
         pthread_mutex_init(&queue_mutex_, nullptr);
+        pthread_mutex_init(&timer_mutex_, nullptr);
 
         running_ = true;
-        pthread_create(&thread_, nullptr, static_loop, this);
+        pthread_create(&thread_,      nullptr, static_loop,      this);
+        pthread_create(&idle_thread_, nullptr, static_idle_loop, this);
     }
 
-    /**
-     * @brief Signal the worker thread to stop and block until it exits.
-     *
-     * Idempotent — safe to call multiple times or when never started.
-     * Closes the eventfd and epoll file descriptors after joining.
-     */
     void stop() {
         if (!running_) return;
         running_ = false;
 
-        // Write to the eventfd so epoll_wait returns and the loop sees !running_.
         uint64_t wake = 1;
-        write(efd_, &wake, sizeof(wake));
+        ::write(efd_,      &wake, sizeof(wake));
+        ::write(idle_efd_, &wake, sizeof(wake));
 
-        pthread_join(thread_, nullptr);
-        close(efd_);
-        close(epfd_);
+        pthread_join(thread_,      nullptr);
+        pthread_join(idle_thread_, nullptr);
+
+        close(efd_);      efd_      = -1;
+        close(epfd_);     epfd_     = -1;
+        close(idle_efd_); idle_efd_ = -1;
+
         pthread_mutex_destroy(&queue_mutex_);
+        pthread_mutex_destroy(&timer_mutex_);
+    }
+
+    // Returns current time in nanoseconds (CLOCK_MONOTONIC).
+    static uint64_t monotonic_ns() {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return static_cast<uint64_t>(ts.tv_sec) * 1'000'000'000ULL +
+               static_cast<uint64_t>(ts.tv_nsec);
+    }
+
+    // Exposed so Demultiplexer and the idle thread can call it.
+    // Implements the 6-step release-guard protocol (paper Section V-C).
+    void process_subtask(Subtask* s) {
+        // Step 2: skip if already executing (leader/followers guard)
+        if (s->in_processing.exchange(true)) return;
+
+        uint64_t now = monotonic_ns();
+
+        // Steps 3 & 4a: check if release time has arrived
+        if (s->period_ns > 0 && s->next_release_ns > 0 && now < s->next_release_ns) {
+            // Defer: push into timer queue; idle thread will re-submit when ready
+            s->in_processing.store(false);
+
+            pthread_mutex_lock(&timer_mutex_);
+            timer_queue_.push({s->next_release_ns, s});
+            pthread_mutex_unlock(&timer_mutex_);
+
+            // Wake the idle thread so it can sleep-until the right moment
+            uint64_t sig = 1;
+            ::write(idle_efd_, &sig, sizeof(sig));
+            return;
+        }
+
+        // Step 4b: advance next_release_ns for strict periodicity
+        if (s->period_ns > 0) {
+            s->next_release_ns = (s->next_release_ns == 0)
+                ? now + s->period_ns
+                : s->next_release_ns + s->period_ns;
+        }
+
+        // Execute the subtask
+        s->execute();
+
+        // Step 5: propagate to downstream subtasks
+        for (auto& conn : s->downstream)
+            conn.dispatcher->notify(conn.subtask);
+
+        // Step 6: clear in_processing
+        s->in_processing.store(false);
+    }
+
+    // Called by the idle thread: dispatch earliest timer entry if past due.
+    void dispatch_expired_timers() {
+        uint64_t now = monotonic_ns();
+
+        pthread_mutex_lock(&timer_mutex_);
+        while (!timer_queue_.empty() && timer_queue_.top().release_ns <= now) {
+            Subtask* s = timer_queue_.top().subtask;
+            timer_queue_.pop();
+            pthread_mutex_unlock(&timer_mutex_);
+
+            pthread_mutex_lock(&queue_mutex_);
+            queue_.push(s);
+            pthread_mutex_unlock(&queue_mutex_);
+
+            uint64_t sig = 1;
+            ::write(efd_, &sig, sizeof(sig));
+
+            pthread_mutex_lock(&timer_mutex_);
+        }
+        pthread_mutex_unlock(&timer_mutex_);
     }
 
 private:
-
-    /**
-     * @brief Main event loop executed inside the worker thread.
-     *
-     * Steps per iteration:
-     *   1. epoll_wait() — sleep until a notification arrives (100 ms timeout
-     *      so the loop can detect running_ == false even with no events).
-     *   2. read(eventfd) — consume one semaphore count.
-     *   3. Dequeue the next Subtask under the mutex.
-     *   4. Call subtask->execute() (no lock held during execution).
-     */
     void loop() {
+        // Pin to designated core
         cpu_set_t mask;
         CPU_ZERO(&mask);
         CPU_SET(core_, &mask);
         pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
 
-        struct sched_param param;
+        // Apply real-time priority (requires CAP_SYS_NICE / root)
+        struct sched_param param{};
         param.sched_priority = priority_;
         if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0)
-            std::cout << "  [warning] RT priority not applied, run with sudo\n";
+            std::cerr << "[Dispatcher core=" << core_
+                      << "] warning: RT priority not applied (run with sudo)\n";
 
-        std::cout << "[Dispatcher] core=" << core_
+        std::cerr << "[Dispatcher] core=" << core_
                   << " priority=" << priority_ << " started\n";
 
         struct epoll_event events[1];
 
         while (running_) {
-            int n = epoll_wait(epfd_, events, 1, /*timeout_ms=*/100);
+            int n = epoll_wait(epfd_, events, 1, /*timeout_ms=*/20);
             if (n <= 0) continue;
 
             uint64_t val;
-            read(efd_, &val, sizeof(val));
+            ::read(efd_, &val, sizeof(val));
 
+            // Step 1: dequeue one subtask
             pthread_mutex_lock(&queue_mutex_);
-            if (queue_.empty()) {
-                pthread_mutex_unlock(&queue_mutex_);
-                continue;
-            }
+            if (queue_.empty()) { pthread_mutex_unlock(&queue_mutex_); continue; }
             Subtask* next = queue_.front();
             queue_.pop();
             pthread_mutex_unlock(&queue_mutex_);
 
-            std::cout << "[Dispatcher core " << core_ << "] running: "
-                      << next->name << "\n";
-            next->execute();
+            // Steps 2–6
+            process_subtask(next);
+
+            // Paper step 5 continuation: drain remaining ready subtasks
+            while (true) {
+                pthread_mutex_lock(&queue_mutex_);
+                if (queue_.empty()) { pthread_mutex_unlock(&queue_mutex_); break; }
+                next = queue_.front();
+                queue_.pop();
+                pthread_mutex_unlock(&queue_mutex_);
+                process_subtask(next);
+            }
         }
 
-        std::cout << "[Dispatcher] core=" << core_ << " stopped\n";
+        std::cerr << "[Dispatcher] core=" << core_ << " stopped\n";
     }
 
-    /** pthread_create requires a static function; this trampoline forwards to loop(). */
+    // Idle thread: lowest real-time priority — only runs when core is idle.
+    // Drains the timer queue to allow early release (paper Section V-C).
+    void idle_loop() {
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        CPU_SET(core_, &mask);
+        pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
+
+        struct sched_param param{};
+        param.sched_priority = 1; // minimum SCHED_FIFO priority
+        pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+
+        int idle_epfd = epoll_create1(0);
+        struct epoll_event ev{};
+        ev.events  = EPOLLIN;
+        ev.data.fd = idle_efd_;
+        epoll_ctl(idle_epfd, EPOLL_CTL_ADD, idle_efd_, &ev);
+
+        struct epoll_event events[1];
+        while (running_) {
+            // Short timeout so we periodically check expired timers even if
+            // no explicit signal arrives (handles race between timer expiry
+            // and idle_efd_ write).
+            int n = epoll_wait(idle_epfd, events, 1, /*timeout_ms=*/10);
+            if (n > 0) {
+                uint64_t val;
+                ::read(idle_efd_, &val, sizeof(val)); // drain one token
+            }
+
+            dispatch_expired_timers();
+        }
+
+        close(idle_epfd);
+    }
+
     static void* static_loop(void* arg) {
-        static_cast<Dispatcher*>(arg)->loop();
-        return nullptr;
+        static_cast<Dispatcher*>(arg)->loop(); return nullptr;
+    }
+    static void* static_idle_loop(void* arg) {
+        static_cast<Dispatcher*>(arg)->idle_loop(); return nullptr;
     }
 
-    int core_;      ///< CPU core index for thread affinity.
-    int priority_;  ///< SCHED_FIFO real-time priority.
-    int efd_;       ///< eventfd file descriptor (semaphore mode).
-    int epfd_;      ///< epoll instance that watches efd_.
+    int core_;
+    int priority_;
+    int efd_;
+    int epfd_;
+    int idle_efd_;
 
-    std::atomic<bool>    running_;     ///< Loop exit flag; set to false by stop().
-    std::queue<Subtask*> queue_;       ///< FIFO of subtasks waiting to execute.
-    pthread_mutex_t      queue_mutex_; ///< Protects queue_ during push/pop.
-    pthread_t            thread_;      ///< The worker thread handle.
+    std::atomic<bool>    running_;
+    std::queue<Subtask*> queue_;
+    pthread_mutex_t      queue_mutex_;
+    TimerQueue           timer_queue_;
+    pthread_mutex_t      timer_mutex_;
 
-    std::vector<Subtask*> subtasks_;   ///< All subtasks registered to this Dispatcher.
+    pthread_t thread_;
+    pthread_t idle_thread_;
+
+    std::vector<Subtask*> subtasks_;
 };
