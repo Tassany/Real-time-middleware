@@ -1,27 +1,33 @@
 #ifndef ADAPTER_HPP
 #define ADAPTER_HPP
 
+#include <functional>
+
+// ----------------------------------------------------------------
+//  Adapter<Upstream, Downstream>
+//
+//  Type-safe conversion between an upstream component's output and
+//  a downstream component's input (paper Section IV-B).
+//
+//  Accepts both plain function pointers and lambdas (including those
+//  that capture variables), since AdapterFunction is std::function.
+// ----------------------------------------------------------------
 template<typename UpstreamComponent, typename DownstreamComponent>
-class Adapter{
+class Adapter {
 public:
-    typedef typename UpstreamComponent::output_type  upstream_output;
-    typedef typename DownstreamComponent::input_type downstream_input;
-    Adapter() {}    
+    using upstream_output  = typename UpstreamComponent::output_type;
+    using downstream_input = typename DownstreamComponent::input_type;
 
-    // Define um tipo AdapterFunction, que é um ponteiro para uma função adaptadora
-    // Recebe um upstream_output como parametro
-    // Retorna downstream_input
-    typedef downstream_input (*AdapterFunction)(const upstream_output&);
+    using AdapterFunction = std::function<downstream_input(const upstream_output&)>;
 
-    Adapter(AdapterFunction func) : func_(func){}
+    explicit Adapter(AdapterFunction func) : func_(std::move(func)) {}
 
-    downstream_input convert(const upstream_output& value) {
+    downstream_input convert(const upstream_output& value) const {
         return func_(value);
     }
 
 private:
     AdapterFunction func_;
-
 };
 
 #endif // ADAPTER_HPP
