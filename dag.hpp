@@ -36,6 +36,9 @@ public:
     // Number of direct successors of node `id`. Returns -1 if not found.
     int fan_out_count(int id) const;
 
+    // Read-only access to all nodes (used by TeamManager for wiring).
+    const std::vector<Node>& nodes() const { return nodes_; }
+
 private:
     std::vector<Node> nodes_; // List of subtasks (nodes) in the DAG
 

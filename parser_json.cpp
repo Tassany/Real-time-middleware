@@ -34,8 +34,10 @@ std::vector<TaskInfo> JsonParser::parse_tasks(const json& j) {
     std::vector<TaskInfo> tasks;
     for (const auto& t : j["tasks"]) {
         TaskInfo task;
-        task.id     = t["id"];
+        task.id       = t["id"];
         task.subtasks = parse_subtasks(t);
+        for (auto& s : task.subtasks)
+            s.task_id = task.id;
         tasks.push_back(task);
     }
     return tasks;
@@ -47,7 +49,7 @@ std::vector<SubtaskInfo> JsonParser::parse_subtasks(const json& j) {
         SubtaskInfo subtask;
         subtask.id      = s.value("id", 0);
         subtask.component_type = s["component_type"];
-        subtask.host      = s["host"];
+        subtask.host      = s.value("host", std::string{""});
         subtask.core      = s["core"];
         subtask.priority  = s["priority"];
         subtask.period_ns   = s.value("period_ns", uint64_t(0));

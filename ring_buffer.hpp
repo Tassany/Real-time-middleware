@@ -35,6 +35,44 @@
 static constexpr size_t CACHE_LINE_SIZE = 64; // Specific for x86-64
 
 // ============================================================
+//  Ring buffer sizing formula  (paper Section IV)
+//
+//  N = next_pow2(max(2, ceil(deadline_downstream / period_upstream)
+//                         + pipeline_depth))
+//
+//  next_pow2 is required because RingBuffer uses a power-of-2 mask
+//  to wrap indices without a modulo operation.
+//
+//  Use ring_buffer_n() wherever you need the compile-time N:
+//    - TeamManager::ring_buffer_size()  — advisory, shows required N
+//    - tools/codegen                    — emits RingBuffer<T, N> declarations
+// ============================================================
+
+inline constexpr std::size_t ring_buffer_next_pow2(std::size_t n) noexcept {
+    if (n == 0) return 1;
+    std::size_t p = 1;
+    while (p < n) p <<= 1;
+    return p;
+}
+
+// period_up == 0 means aperiodic upstream: uses depth + 2 as the base.
+inline constexpr std::size_t ring_buffer_n(
+    std::uint64_t period_up_ns,
+    std::uint64_t deadline_down_ns,
+    int           pipeline_depth) noexcept
+{
+    std::size_t base = 0;
+    if (period_up_ns == 0) {
+        base = static_cast<std::size_t>(pipeline_depth) + 2;
+    } else {
+        std::size_t jif = (deadline_down_ns + period_up_ns - 1) / period_up_ns;
+        base = (jif + static_cast<std::size_t>(pipeline_depth));
+        if (base < 2) base = 2;
+    }
+    return ring_buffer_next_pow2(base);
+}
+
+// ============================================================
 //  RingBuffer<T, N> sequence-number addressed
 // ============================================================
 

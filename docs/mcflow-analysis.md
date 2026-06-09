@@ -14,7 +14,7 @@ RT-CORBA/TAO não foi projetado para paralelismo fino de subtarefas em plataform
 
 ### Modelo de Sistema
 
-- Ambiente distribuído: hosts multi-core conectados por rede
+- ~~Ambiente distribuído: hosts multi-core conectados por rede~~ **→ fora de escopo: implementação restrita a um único host multi-core**
 - Tarefas modeladas como **DAGs**: vértices = subtarefas, arestas = dependências de precedência
 - **Team**: conjunto de subtarefas de uma mesma tarefa alocadas no mesmo host
 - **Job**: uma invocação de uma tarefa; **Subjob**: uma invocação de uma subtarefa
@@ -24,21 +24,21 @@ RT-CORBA/TAO não foi projetado para paralelismo fino de subtarefas em plataform
 
 ### Três Contribuições Principais
 
-| # | Contribuição | Descrição |
-|---|---|---|
-| 1 | **Modelo de Componente Leve** | Cada componente C++ declara `input_type`, `output_type`, `config_type`, `execute()`, `init_input()`, `init_output()`; ferramenta de deployment gera C++ + Makefiles automaticamente |
-| 2 | **Otimização Transparente de Comunicação** | Intra-core: chamada direta; inter-core: ring buffer lock-free; inter-host: sockets — selecionado pelo middleware conforme a topologia |
-| 3 | **Polimorfismo de Interface via Adapters** | Adapters type-safe separam correção funcional das restrições de cópia de memória |
+| # | Contribuição | Descrição | Escopo |
+|---|---|---|---|
+| 1 | **Modelo de Componente Leve** | Cada componente C++ declara `input_type`, `output_type`, `config_type`, `execute()`, `init_input()`, `init_output()`; ferramenta de deployment gera C++ + Makefiles automaticamente | ✅ implementado |
+| 2 | **Otimização Transparente de Comunicação** | Intra-core: chamada direta; inter-core: ring buffer lock-free; ~~inter-host: sockets~~ | ⚠️ apenas intra-host |
+| 3 | **Polimorfismo de Interface via Adapters** | Adapters type-safe separam correção funcional das restrições de cópia de memória | ✅ implementado |
 
 ### Arquitetura — Dois Subsistemas (Figura 2 do paper)
 
 #### Subsistema de Gerenciamento de Tarefas
 
-| Componente | Responsabilidade |
-|---|---|
-| **Host Manager** | Coordena todos os Team Managers no host; protocolo de inicialização distribuído |
-| **Team Manager** | Ciclo de vida de um conjunto de subtarefas: CREATED → INITIALIZED → RUNNING → TERMINATING → TERMINATED |
-| Protocolo de terminação | Executado na prioridade RT da tarefa; propaga `termination request` para sucessores; desaloca recursos após confirmação de todos |
+| Componente | Responsabilidade | Escopo |
+|---|---|---|
+| ~~**Host Manager**~~ | ~~Coordena todos os Team Managers no host; protocolo de inicialização distribuído~~ | ❌ fora de escopo (single-host) |
+| **Team Manager** | Ciclo de vida de um conjunto de subtarefas: CREATED → INITIALIZED → RUNNING → TERMINATING → TERMINATED | ✅ implementado |
+| Protocolo de terminação | Executado na prioridade RT da tarefa; propaga `termination request` para sucessores; desaloca recursos após confirmação de todos | ✅ implementado |
 
 #### Subsistema de Despacho (Real-time)
 
@@ -177,36 +177,40 @@ O protocolo garante que o **intervalo entre releases nunca é menor que o perío
 
 ---
 
-### 2.7 Comunicação Inter-Host
+### 2.7 Comunicação Inter-Host — Fora de Escopo
 
-| Conceito do Paper | Status | Arquivo | Observação |
-|---|---|---|---|
-| Comunicação via sockets TCP entre hosts | ❌ Ausente | — | `HostInfo` existe mas sem código de rede |
-| Seleção automática: intra-core / inter-core / inter-host | ❌ Ausente | — | Nenhuma transparência de localização |
-| Entrega direta ao core de destino (sem thread intermediária) | ❌ Ausente | — | |
+A implementação é restrita a **um único host multi-core**. Os mecanismos de comunicação distribuída descritos no paper não são implementados e não constam no roadmap.
+
+| Conceito do Paper | Decisão |
+|---|---|
+| Comunicação via sockets TCP entre hosts | 🚫 fora de escopo |
+| `HostManager` coordenando múltiplos hosts | 🚫 fora de escopo |
+| Seleção automática intra-core / inter-core / inter-host | 🚫 fora de escopo (apenas inter-core via ring buffer) |
+| Entrega direta ao core de destino (sem thread intermediária) | 🚫 fora de escopo |
 
 ---
 
-### 2.8 Resumo Quantitativo
+### 2.8 Resumo Quantitativo (escopo single-host)
 
-| Categoria | ✅ Implementado | ⚠️ Parcial | ❌ Ausente | Total |
-|---|---|---|---|---|
-| Modelo de Componente | 4 | 1 | 3 | 8 |
-| Deployment Plan | 3 | 1 | 2 | 6 |
-| DAG | 2 | 1 | 3 | 6 |
-| Ring Buffer / ITC | 1 | 2 | 4 | 7 |
-| Dispatcher / Despacho | 4 | 0 | 9 | 13 |
-| Team / Host Manager | 1 | 0 | 5 | 6 |
-| Comunicação Inter-Host | 0 | 0 | 3 | 3 |
-| **TOTAL** | **15 (30%)** | **5 (10%)** | **29 (58%)** | **49** |
+> Itens marcados como 🚫 fora de escopo são excluídos do denominador.
 
-### Lacunas Críticas (bloqueantes imediatos)
+| Categoria | ✅ Implementado | ⚠️ Parcial | ❌ Pendente | 🚫 Fora de escopo | Total no escopo |
+|---|---|---|---|---|---|
+| Modelo de Componente | 7 | 0 | 1 | 0 | 8 |
+| Deployment Plan | 4 | 0 | 1 | 0 | 5 |
+| DAG | 5 | 0 | 0 | 0 | 5 |
+| Ring Buffer / ITC | 5 | 0 | 1 | 0 | 6 |
+| Dispatcher / Despacho | 9 | 0 | 1 | 0 | 10 |
+| Team Manager | 6 | 0 | 0 | 0 | 6 |
+| Comunicação Inter-Host | — | — | — | 4 | — |
+| **TOTAL** | **36 (90%)** | **0** | **4 (10%)** | **4** | **40** |
 
-1. **Bug de compilação** — `period_ns`/`deadline_ns` em `parser_json.cpp:53-54` sem correspondência em `SubtaskInfo`
-2. **Timer queue + release-guard** — sem isso não há escalonamento periódico correto
-3. **Fan-in no dispatcher** — consumidor não espera todos os suppliers; DAGs com fan-in produziriam resultados incorretos
-4. **Team Manager** — sem gerenciamento de ciclo de vida não há inicialização nem terminação controlada
-5. **Cache-line padding** — sem isso o ring buffer sofre false sharing, degradando o desempenho inter-core exatamente onde o paper garante vantagem sobre TAO
+### Lacunas Pendentes (escopo single-host)
+
+1. **Codegen** — ferramenta `tools/codegen.cpp` que gera C++ + Makefile a partir do `deployment_plan.json` (Fase 7)
+2. **`preallocate()` forçado** — framework não garante que seja chamado antes do loop real-time; depende do usuário
+3. **Seleção intra-core vs inter-core** — ring buffer usado para todas as conexões inter-thread; chamada direta para intra-core não está automatizada
+4. **`static_assert` de N** — ring buffer não verifica em compile time que `N ≥ pipeline_depth`
 
 ---
 
@@ -215,12 +219,13 @@ O protocolo garante que o **intervalo entre releases nunca é menor que o perío
 ### Visão Geral das Fases
 
 ```
-Fase 0 → Fase 1 → Fase 2 → Fase 3 → Fase 4 → Fase 5 → [Fase 6] → [Fase 7]
- Bug fix   DAG     RingBuf  Compon.  Dispatch  TeamMgr   Distrib.  Codegen
+Fase 0 → Fase 1 → Fase 2 → Fase 3 → Fase 4 → Fase 5 → Fase 6
+ Bug fix   DAG     RingBuf  Compon.  Dispatch  TeamMgr  Codegen
 ```
 
-Fases 0–5: necessárias para MCFlow funcionar como descrito no paper.  
-Fases 6–7: completam as contribuições de distribuição e geração de código automático.
+Fases 0–5: ✅ concluídas. Cobrem todo o escopo single-host do MCFlow.  
+Fase 6: codegen — única fase pendente no roadmap.  
+~~Fase de comunicação distribuída~~: removida do roadmap (fora de escopo).
 
 ---
 
@@ -408,82 +413,64 @@ Fases 6–7: completam as contribuições de distribuição e geração de códi
 
 ---
 
-### Fase 6 — Host Manager e Comunicação Distribuída *(futura)*
+### ~~Fase de Comunicação Distribuída~~ — Removida do Roadmap
 
-**Objetivo**: suporte a execução multi-host com seleção transparente de mecanismo de comunicação.
-
-**Arquivos novos**: `host_manager.hpp`, `host_manager.cpp`, `connector.hpp`
-
-**Tarefas**:
-- `HostManager`: coordena múltiplos `TeamManager`s; protocolo de inicialização distribuído (envia init request → aguarda ACK antes de ativar dispatch local)
-- Abstração `Connector` com implementações:
-  - `IntraCoreConnector`: chamada direta (função inline)
-  - `InterCoreConnector`: ring buffer lock-free (Fase 2)
-  - `NetworkConnector`: socket TCP não-bloqueante com epoll
-- Seleção automática de `Connector` baseada em `(host_src, core_src)` vs `(host_dst, core_dst)` do deployment plan
-
-**Critérios de Aceitação**:
-- Dois processos em hosts distintos: subtarefa em host A envia dado; host B recebe e processa corretamente
-- Mudança de `host` no JSON de mesmo-host para host-diferente: sem modificação no código do componente
-
-**Testes Direcionados**:
-
-| Teste | O que verificar |
-|---|---|
-| `test_network_connector` | Dois processos via loopback; 1000 mensagens; zero perda |
-| `test_location_transparency` | Mesmo componente com IntraCore e Network connector; resultados idênticos |
-| `test_host_manager_init` | Protocolo de inicialização: host B inicializado antes de host A iniciar dispatch |
+> Esta fase foi descartada. A implementação cobre apenas um host multi-core.  
+> `HostManager`, `NetworkConnector` e protocolo TCP **não serão implementados**.
 
 ---
 
-### Fase 7 — Ferramenta de Deployment e Geração de Código *(futura)*
+### Fase 6 — Ferramenta de Deployment e Geração de Código
 
-**Objetivo**: gerar C++ + Makefile automaticamente a partir do `deployment_plan.json`.
+**Objetivo**: gerar C++ + Makefile automaticamente a partir do `deployment_plan.json` para um único host multi-core.
 
 **Arquivos novos**: `tools/codegen.cpp`
 
 **Tarefas**:
-- Ler deployment plan; emitir um `.cpp` por host com: instanciação de componentes, criação de ring buffers (com tamanho calculado), wiring de adapters, inicialização do TeamManager
-- Calcular tamanho dos ring buffers: `max(2, ceil(deadline_ns / period_ns) + pipeline_depth)`
-- Emitir Makefile com targets por host
+- Ler `deployment_plan.json`; emitir um `main_generated.cpp` com:
+  - Instanciação de componentes por `component_type` (lido do plano)
+  - `RingBuffer<T, N>` por aresta, com `N = TeamManager::ring_buffer_size(u, v)` calculado em tempo de geração
+  - `static_assert(N >= pipeline_depth)` para cada buffer gerado
+  - Wiring de adapters entre tipos adjacentes
+  - Inicialização e start do `TeamManager`
+- Emitir `Makefile` com target `run` que compila e executa o binário gerado
 
 **Critérios de Aceitação**:
-- `./codegen deployment_plan.json` gera código que compila e reproduz o comportamento de `main.cc`
-- Ring buffer size calculado automaticamente; `static_assert` se size < pipeline_depth
-- Código gerado para DAG diamond produz resultado correto com fan-in
+- `./codegen deployment_plan.json` gera código que compila sem warnings
+- Código gerado reproduz o comportamento de `main.cc` para a pipeline atual
+- Ring buffer size calculado automaticamente; `static_assert` falha se `N < pipeline_depth`
+- DAG diamond no plano: fan-in gerado corretamente
 
 **Testes Direcionados**:
 
 | Teste | O que verificar |
 |---|---|
 | `test_codegen_linear` | Plano linear de 4 subtarefas; código gerado compila e produz output correto |
-| `test_codegen_diamond` | DAG diamond; fan-in correto no código gerado |
-| `test_codegen_buffer_size` | Verificar que `static_assert` falha se `deadline/period + depth > N` |
+| `test_codegen_diamond` | DAG diamond no JSON; fan-in e `fan_in_total=2` no código gerado |
+| `test_codegen_buffer_size` | `static_assert` presente no código gerado; falha com N deliberadamente pequeno |
 
 ---
 
-## 4. Estrutura de Arquivos de Teste Proposta
+## 4. Estrutura de Arquivos
 
 ```
 tests/
-  test_parser.cpp          # Fase 0
-  test_dag.cpp             # Fase 1
-  test_ringbuf.cpp         # Fase 2
-  test_component.cpp       # Fase 3
-  test_dispatcher.cpp      # Fase 4
-  test_team_manager.cpp    # Fase 5
+  test_parser.cpp          # Fase 0 ✅
+  test_dag.cpp             # Fase 1 ✅
+  test_ringbuf.cpp         # Fase 2 ✅
+  test_component.cpp       # Fase 3 ✅
+  test_dispatcher.cpp      # Fase 4 ✅
+  test_team_manager.cpp    # Fase 5 ✅
+
+examples/
+  example_ring.cpp
+  example_two_threads.cpp
+  example_dispatcher.cpp
+  example_pipeline.cpp     # dispatcher: cadeia periódica + fan-in
+  example_team_manager.cpp # team manager: wiring automático via DAG
+
+tools/
+  codegen.cpp              # Fase 6 — pendente
 ```
 
-Adicionar ao `Makefile`:
-
-```makefile
-TESTS = test_parser test_dag test_ringbuf test_component test_dispatcher test_team_manager
-
-tests: $(TESTS)
-
-test_%: tests/test_%.cpp parser_json.cpp dag.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^ -lpthread
-
-test: tests
-	for t in $(TESTS); do ./$$t && echo "$$t PASSED" || echo "$$t FAILED"; done
-```
+Status do `make test`: **33 testes, 0 falhas** (Fases 0–5 concluídas).

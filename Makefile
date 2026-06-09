@@ -38,7 +38,24 @@ example_epoll: $(EXAMPLES_DIR)/example_epoll.cpp
 example_pipeline: $(EXAMPLES_DIR)/example_pipeline.cpp dispatcher.hpp ring_buffer.hpp
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $<
 
-examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline
+example_team_manager: $(EXAMPLES_DIR)/example_team_manager.cpp team_manager.cpp team_manager.hpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_team_manager.cpp team_manager.cpp dag.cpp
+
+example_full_pipeline: $(EXAMPLES_DIR)/example_full_pipeline.cpp team_manager.cpp team_manager.hpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_full_pipeline.cpp team_manager.cpp dag.cpp
+
+examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline example_team_manager example_full_pipeline
+
+# -----------------------------------------------------------------------
+#  Phase 6 — Code generator
+# -----------------------------------------------------------------------
+TOOLS_DIR = tools
+
+codegen: $(TOOLS_DIR)/codegen.cpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(TOOLS_DIR)/codegen.cpp dag.cpp
+
+codegen_run: codegen
+	./codegen deployment_plan_6tasks.json
 
 # -----------------------------------------------------------------------
 #  Tests
@@ -61,10 +78,10 @@ test_component: $(TESTS_DIR)/test_component.cpp $(HDRS)
 test_dispatcher: $(TESTS_DIR)/test_dispatcher.cpp dag.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_dispatcher.cpp dag.cpp
 
-test_team_manager: $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_team_manager.cpp parser_json.cpp dag.cpp
+test_team_manager: $(TESTS_DIR)/test_team_manager.cpp team_manager.cpp dag.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(TESTS_DIR)/test_team_manager.cpp team_manager.cpp dag.cpp
 
-test: test_parser test_dag test_ringbuf test_component test_dispatcher
+test: test_parser test_dag test_ringbuf test_component test_dispatcher test_team_manager
 	@echo "--- Fase 0: Parser ---"
 	@./test_parser
 	@echo "--- Fase 1: DAG ---"
@@ -75,11 +92,16 @@ test: test_parser test_dag test_ringbuf test_component test_dispatcher
 	@./test_component
 	@echo "--- Fase 4: Dispatcher ---"
 	@./test_dispatcher
+	@echo "--- Fase 5: Team Manager ---"
+	@./test_team_manager
 
 tests: $(TESTS_BINS)
 
 clean:
 	rm -f $(TARGET) $(TESTS_BINS) \
-	      example_ring example_eventfd example_two_threads example_dispatcher example_epoll
+	      example_ring example_eventfd example_two_threads example_dispatcher \
+	      example_epoll example_pipeline example_team_manager example_full_pipeline \
+	      codegen
+	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 
-.PHONY: clean examples tests test
+.PHONY: clean examples tests test codegen_run

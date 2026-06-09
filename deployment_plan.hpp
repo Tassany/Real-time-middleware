@@ -16,11 +16,12 @@ struct HostInfo {
 
 
 struct SubtaskInfo {
-    int        id;      
-    std::string component_type;    
-    std::string host;         
-    int         core;         
-    int         priority;  
+    int         task_id = 0;     // parent task; set by parser, 0 for manually-built entries
+    int         id      = 0;    // subtask (globally unique across all tasks)
+    std::string component_type;
+    std::string host;
+    int         core;
+    int         priority;
     uint64_t    period_ns;
     uint64_t    deadline_ns;
     json        config;

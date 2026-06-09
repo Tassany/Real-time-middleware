@@ -12,7 +12,6 @@
                 {
                     "id": 1,
                     "component_type": "source",
-                    "host": "server",
                     "core": 1,
                     "priority": 1,
                     "period_ns": 100000000,   
@@ -21,12 +20,10 @@
                         "scale_factor": 2.5,
                         "threshold": 100
                     }
-
                 },
                 {
                     "id": 2,
                     "component_type": "intermediate",
-                    "host": "server",
                     "core": 1,
                     "priority": 1,
                     "period_ns": 200000000,  
@@ -35,7 +32,6 @@
                 {
                     "id": 3,
                     "component_type": "intermediate",
-                    "host": "server",
                     "core": 1,
                     "priority": 1,
                     "period_ns": 300000000,   
@@ -44,7 +40,6 @@
                 {
                     "id": 4,
                     "component_type": "sink",
-                    "host": "server",
                     "core": 1,
                     "priority": 1,
                     "period_ns": 400000000,  
