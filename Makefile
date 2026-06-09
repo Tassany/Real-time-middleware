@@ -44,7 +44,13 @@ example_team_manager: $(EXAMPLES_DIR)/example_team_manager.cpp team_manager.cpp 
 example_full_pipeline: $(EXAMPLES_DIR)/example_full_pipeline.cpp team_manager.cpp team_manager.hpp dag.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_full_pipeline.cpp team_manager.cpp dag.cpp
 
-examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline example_team_manager example_full_pipeline
+example_from_plan: $(EXAMPLES_DIR)/example_from_plan.cpp team_manager.cpp team_manager.hpp dag.cpp parser_json.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_from_plan.cpp team_manager.cpp dag.cpp parser_json.cpp
+
+example_eval: $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp team_manager.hpp dag.cpp parser_json.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp dag.cpp parser_json.cpp
+
+examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline example_team_manager example_full_pipeline example_from_plan example_eval
 
 # -----------------------------------------------------------------------
 #  Phase 6 — Code generator
@@ -101,7 +107,7 @@ clean:
 	rm -f $(TARGET) $(TESTS_BINS) \
 	      example_ring example_eventfd example_two_threads example_dispatcher \
 	      example_epoll example_pipeline example_team_manager example_full_pipeline \
-	      codegen
+	      example_from_plan example_eval codegen
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 
 .PHONY: clean examples tests test codegen_run

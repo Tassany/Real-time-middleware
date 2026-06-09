@@ -1,56 +1,87 @@
 {
-    "hosts": [
-        {
-            "name": "server",
-            "address": "192.168.1.2"
-        }
-    ],
-    "tasks": [
-        {
-            "id": 1,
-            "subtasks": [
-                {
-                    "id": 1,
-                    "component_type": "source",
-                    "core": 1,
-                    "priority": 1,
-                    "period_ns": 100000000,   
-                    "deadline_ns": 100000000,
-                    "config": {
-                        "scale_factor": 2.5,
-                        "threshold": 100
-                    }
-                },
-                {
-                    "id": 2,
-                    "component_type": "intermediate",
-                    "core": 1,
-                    "priority": 1,
-                    "period_ns": 200000000,  
-                    "deadline_ns": 200000000  
-                },
-                {
-                    "id": 3,
-                    "component_type": "intermediate",
-                    "core": 1,
-                    "priority": 1,
-                    "period_ns": 300000000,   
-                    "deadline_ns": 300000000 
-                },
-                {
-                    "id": 4,
-                    "component_type": "sink",
-                    "core": 1,
-                    "priority": 1,
-                    "period_ns": 400000000,  
-                    "deadline_ns": 400000000 
-                }
-            ]
-        }
-    ],
-    "connections": [
-        { "upstream": 1, "downstream": 2 },
-        { "upstream": 2, "downstream": 3 },
-        { "upstream": 3, "downstream": 4 }
-    ]
+  "hosts": [
+    { "name": "localhost", "address": "127.0.0.1" }
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "subtasks": [
+        { "id": 1,  "component_type": "source",       "core": 0, "priority": 16,
+          "period_ns": 1000000,  "deadline_ns": 1000000,  "output_type": "double", "config": {} },
+        { "id": 2,  "component_type": "intermediate", "core": 1, "priority": 16,
+          "period_ns": 1000000,  "deadline_ns": 1000000,  "output_type": "double", "config": {} },
+        { "id": 3,  "component_type": "sink",         "core": 2, "priority": 16,
+          "period_ns": 1000000,  "deadline_ns": 1000000,  "output_type": "void",   "config": {} }
+      ]
+    },
+    {
+      "id": 2,
+      "subtasks": [
+        { "id": 4,  "component_type": "source",       "core": 0, "priority": 14,
+          "period_ns": 2000000,  "deadline_ns": 2000000,  "output_type": "double", "config": {} },
+        { "id": 5,  "component_type": "intermediate", "core": 1, "priority": 14,
+          "period_ns": 2000000,  "deadline_ns": 2000000,  "output_type": "double", "config": {} },
+        { "id": 6,  "component_type": "sink",         "core": 2, "priority": 14,
+          "period_ns": 2000000,  "deadline_ns": 2000000,  "output_type": "void",   "config": {} }
+      ]
+    },
+    {
+      "id": 3,
+      "subtasks": [
+        { "id": 7,  "component_type": "source",       "core": 0, "priority": 12,
+          "period_ns": 6000000,  "deadline_ns": 6000000,  "output_type": "double", "config": {} },
+        { "id": 8,  "component_type": "intermediate", "core": 1, "priority": 12,
+          "period_ns": 6000000,  "deadline_ns": 6000000,  "output_type": "double", "config": {} },
+        { "id": 9,  "component_type": "sink",         "core": 2, "priority": 12,
+          "period_ns": 6000000,  "deadline_ns": 6000000,  "output_type": "void",   "config": {} }
+      ]
+    },
+    {
+      "id": 4,
+      "subtasks": [
+        { "id": 10, "component_type": "source",       "core": 0, "priority": 10,
+          "period_ns": 12000000, "deadline_ns": 12000000, "output_type": "double", "config": {} },
+        { "id": 11, "component_type": "intermediate", "core": 1, "priority": 10,
+          "period_ns": 12000000, "deadline_ns": 12000000, "output_type": "double", "config": {} },
+        { "id": 12, "component_type": "sink",         "core": 2, "priority": 10,
+          "period_ns": 12000000, "deadline_ns": 12000000, "output_type": "void",   "config": {} }
+      ]
+    },
+    {
+      "id": 5,
+      "subtasks": [
+        { "id": 13, "component_type": "source",       "core": 0, "priority": 8,
+          "period_ns": 24000000, "deadline_ns": 24000000, "output_type": "double", "config": {} },
+        { "id": 14, "component_type": "intermediate", "core": 1, "priority": 8,
+          "period_ns": 24000000, "deadline_ns": 24000000, "output_type": "double", "config": {} },
+        { "id": 15, "component_type": "sink",         "core": 2, "priority": 8,
+          "period_ns": 24000000, "deadline_ns": 24000000, "output_type": "void",   "config": {} }
+      ]
+    },
+    {
+      "id": 6,
+      "subtasks": [
+        { "id": 16, "component_type": "source",       "core": 0, "priority": 6,
+          "period_ns": 48000000, "deadline_ns": 48000000, "output_type": "double", "config": {} },
+        { "id": 17, "component_type": "intermediate", "core": 1, "priority": 6,
+          "period_ns": 48000000, "deadline_ns": 48000000, "output_type": "double", "config": {} },
+        { "id": 18, "component_type": "sink",         "core": 2, "priority": 6,
+          "period_ns": 48000000, "deadline_ns": 48000000, "output_type": "void",   "config": {} }
+      ]
+    }
+  ],
+  "connections": [
+    { "upstream": 1,  "downstream": 2  },
+    { "upstream": 2,  "downstream": 3  },
+    { "upstream": 4,  "downstream": 5  },
+    { "upstream": 5,  "downstream": 6  },
+    { "upstream": 7,  "downstream": 8  },
+    { "upstream": 8,  "downstream": 9  },
+    { "upstream": 10, "downstream": 11 },
+    { "upstream": 11, "downstream": 12 },
+    { "upstream": 13, "downstream": 14 },
+    { "upstream": 14, "downstream": 15 },
+    { "upstream": 16, "downstream": 17 },
+    { "upstream": 17, "downstream": 18 }
+  ]
 }
