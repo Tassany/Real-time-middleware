@@ -1,26 +1,27 @@
 /**
  * example_eval.cpp
  *
- * Evaluates scheduling quality of a deployment plan JSON:
- *   - Release jitter (actual start vs expected release time, per subtask)
- *   - Execution time per subtask
- *   - Deadline misses (finish time > deadline of the current job)
- *   - End-to-end pipeline latency per task (source start → sink finish)
+ * Evaluates scheduling quality for each subtask in a deployment plan:
  *
- * Usage:  ./example_eval <deployment_plan.json>
- *         sudo ./example_eval ...   (SCHED_FIFO requires root / CAP_SYS_NICE)
+ *   Latency  = t_actual - t_scheduled
+ *            = time the scheduler actually started the subtask
+ *              minus the time it was supposed to start.
+ *            Always >= 0 in a causal system. Lower is better.
  *
- * Timing reference: CLOCK_MONOTONIC nanoseconds (Dispatcher::monotonic_ns()).
+ *   Jitter   = variation of the latency across jobs of the same subtask.
+ *            Reported as variance (σ²) and standard deviation (σ).
  *
- * Jitter derivation
- * -----------------
- * Dispatcher::process_subtask() runs step 4b BEFORE calling execute():
- *   s->next_release_ns += s->period_ns          (or = now + period on first job)
- * So at the moment execute() starts:
- *   expected_release = s->next_release_ns - s->period_ns
- *   deadline         = s->next_release_ns
- *   jitter           = t_start - expected_release
- *   miss             = t_end   > deadline
+ * How the values are derived:
+ *   The dispatcher runs step 4b BEFORE calling execute():
+ *     s->next_release_ns += s->period_ns
+ *   Therefore, inside execute():
+ *     t_scheduled = s->next_release_ns - s->period_ns
+ *     t_actual    = Dispatcher::monotonic_ns()  (captured at execute() entry)
+ *     latency     = t_actual - t_scheduled
+ *
+ * Usage:
+ *   ./example_eval <deployment_plan.json>
+ *   sudo ./example_eval ...    (enables SCHED_FIFO; cleaner measurements)
  */
 
 #include <iostream>
@@ -33,12 +34,11 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <cmath>
 #include "team_manager.hpp"
 #include "parser_json.hpp"
 
 // ---------------------------------------------------------------------------
-//  Per-subtask metrics (pre-allocated; no dynamic allocation in RT loop)
+//  Per-subtask metrics
 // ---------------------------------------------------------------------------
 struct SubtaskMetrics {
     int      id        = 0;
@@ -46,10 +46,10 @@ struct SubtaskMetrics {
     int      core      = 0;
     int      priority  = 0;
 
-    std::vector<int64_t>  jitter_ns;   // signed: t_start − expected_release
-    std::vector<uint64_t> exec_ns;     // t_end − t_start
-    std::vector<int64_t>  latency_ns;  // sink only: t_sink_end − t_source_start
-    int deadline_misses = 0;
+    // One entry per job: t_actual - t_scheduled (nanoseconds)
+    std::vector<int64_t> latency_ns;
+
+    int deadline_misses = 0; // jobs where latency > period
 };
 
 // ---------------------------------------------------------------------------
@@ -57,27 +57,26 @@ struct SubtaskMetrics {
 // ---------------------------------------------------------------------------
 static double ns_to_us(double ns) { return ns / 1000.0; }
 
-static double vmean(const std::vector<int64_t>& v) {
+static double mean(const std::vector<int64_t>& v) {
     if (v.empty()) return 0.0;
-    double s = 0.0; for (auto x : v) s += static_cast<double>(x); return s / v.size();
+    double s = 0.0;
+    for (auto x : v) s += static_cast<double>(x);
+    return s / static_cast<double>(v.size());
 }
-static double vmean(const std::vector<uint64_t>& v) {
-    if (v.empty()) return 0.0;
-    double s = 0.0; for (auto x : v) s += static_cast<double>(x); return s / v.size();
+
+// Peak-to-peak jitter: max - min
+static int64_t jitter(const std::vector<int64_t>& v) {
+    if (v.size() < 2) return 0;
+    auto [lo, hi] = std::minmax_element(v.begin(), v.end());
+    return *hi - *lo;
 }
-static int64_t vmax(const std::vector<int64_t>& v) {
-    if (v.empty()) return 0;
-    return *std::max_element(v.begin(), v.end());
-}
+
 static int64_t vmin(const std::vector<int64_t>& v) {
-    if (v.empty()) return 0;
-    return *std::min_element(v.begin(), v.end());
+    return v.empty() ? 0 : *std::min_element(v.begin(), v.end());
 }
-static double vstddev(const std::vector<int64_t>& v) {
-    if (v.size() < 2) return 0.0;
-    double m = vmean(v), s = 0.0;
-    for (auto x : v) { double d = static_cast<double>(x) - m; s += d * d; }
-    return std::sqrt(s / static_cast<double>(v.size()));
+
+static int64_t vmax(const std::vector<int64_t>& v) {
+    return v.empty() ? 0 : *std::max_element(v.begin(), v.end());
 }
 
 // ---------------------------------------------------------------------------
@@ -91,36 +90,20 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    //  1. Parse plan
+    //  1. Parse deployment plan
     // -----------------------------------------------------------------------
     JsonParser parser;
     DeploymentPlan plan = parser.parse(argv[1]);
 
     // -----------------------------------------------------------------------
-    //  2. Predecessor / successor maps
+    //  2. Predecessor map: downstream_id → [upstream_ids]
     // -----------------------------------------------------------------------
-    std::map<int, std::vector<int>> preds, succs;
-    for (auto& conn : plan.connections) {
+    std::map<int, std::vector<int>> preds;
+    for (auto& conn : plan.connections)
         preds[conn.downstream].push_back(conn.upstream);
-        succs[conn.upstream].push_back(conn.downstream);
-    }
 
     // -----------------------------------------------------------------------
-    //  3. Source subtask per task  +  subtask → task mapping
-    // -----------------------------------------------------------------------
-    std::map<int, int> task_source_id;  // task_id   → source subtask_id
-    std::map<int, int> subtask_task_id; // subtask_id → task_id
-
-    for (auto& task : plan.tasks) {
-        for (auto& st : task.subtasks) {
-            subtask_task_id[st.id] = task.id;
-            if (preds.find(st.id) == preds.end())
-                task_source_id[task.id] = st.id;
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    //  4. Shared buffers
+    //  3. Shared state: one atomic<double> slot per subtask id
     // -----------------------------------------------------------------------
     int max_id = 0;
     for (auto& task : plan.tasks)
@@ -128,16 +111,12 @@ int main(int argc, char* argv[]) {
             max_id = std::max(max_id, st.id);
 
     auto vals_buf = std::make_unique<std::atomic<double>[]>(max_id + 1);
-    auto fire_buf = std::make_unique<std::atomic<uint64_t>[]>(max_id + 1);
-    for (int i = 0; i <= max_id; ++i) {
+    for (int i = 0; i <= max_id; ++i)
         vals_buf[i].store(0.0, std::memory_order_relaxed);
-        fire_buf[i].store(0ULL, std::memory_order_relaxed);
-    }
-    auto* v    = vals_buf.get();
-    auto* fire = fire_buf.get();
+    auto* v = vals_buf.get();
 
     // -----------------------------------------------------------------------
-    //  5. Tick parameters (needed for reserve())
+    //  4. Tick loop parameters (needed before reserve())
     // -----------------------------------------------------------------------
     std::vector<std::pair<int, uint64_t>> sources; // {id, period_ns}
     for (auto& task : plan.tasks)
@@ -155,110 +134,102 @@ int main(int argc, char* argv[]) {
     int ticks = static_cast<int>(4 * lcm_p / min_p);
 
     // -----------------------------------------------------------------------
-    //  6. Phase 1 — allocate Subtasks + pre-allocate metrics vectors
+    //  5. Phase 1 — allocate Subtask objects and pre-reserve metrics vectors
     // -----------------------------------------------------------------------
-    std::map<int, SubtaskMetrics> mmap;
+    std::map<int, SubtaskMetrics>           mmap;
     std::map<int, std::unique_ptr<Subtask>> subtask_ptrs;
 
     for (auto& task : plan.tasks) {
         for (auto& st : task.subtasks) {
             subtask_ptrs[st.id] = std::make_unique<Subtask>(st.id, []{});
-            auto& m  = mmap[st.id];
-            m.id       = st.id;
+
+            auto& m   = mmap[st.id];
+            m.id        = st.id;
             m.period_ns = st.period_ns;
-            m.core     = st.core;
-            m.priority = st.priority;
+            m.core      = st.core;
+            m.priority  = st.priority;
+
+            // Max capacity = expected number of jobs for this period
             int cap = (st.period_ns > 0)
-                ? static_cast<int>(4 * lcm_p / st.period_ns) + 8
-                : ticks + 8;
-            m.jitter_ns.reserve(cap);
-            m.exec_ns.reserve(cap);
+                ? static_cast<int>(4 * lcm_p / st.period_ns) + 4
+                : ticks + 4;
             m.latency_ns.reserve(cap);
         }
     }
 
     // -----------------------------------------------------------------------
-    //  7. Phase 2 — wire instrumented execute() lambdas
+    //  6. Phase 2 — assign instrumented execute() lambdas
     //
-    //  Captures:
-    //    v, fire  — raw pointers (stable for lifetime of main)
-    //    s        — Subtask* raw ptr (stable: unique_ptr, never moved)
-    //    &m       — reference to SubtaskMetrics (stable: std::map, never rehashes)
-    //    pred, src_id — int values by copy
+    //  Two-phase pattern: the Subtask already lives on the heap (stable address),
+    //  so we can safely capture 's' as a raw pointer inside the lambda.
+    //  This lets us read s->next_release_ns and s->period_ns at execution time.
     // -----------------------------------------------------------------------
     for (auto& task : plan.tasks) {
         for (auto& info : task.subtasks) {
-            int id = info.id;
-            Subtask* s = subtask_ptrs.at(id).get();
-            auto& m    = mmap.at(id);
+            int      id = info.id;
+            Subtask*  s = subtask_ptrs.at(id).get();
+            auto&     m = mmap.at(id);
 
             if (info.component_type == "source") {
-                s->execute = [v, fire, id, s, &m] {
-                    uint64_t t_start = Dispatcher::monotonic_ns();
-                    fire[id].store(t_start, std::memory_order_release);
+
+                s->execute = [v, id, s, &m] {
+                    uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     v[id].store(v[id].load(std::memory_order_relaxed) + 1.0,
                                 std::memory_order_relaxed);
 
-                    uint64_t t_end = Dispatcher::monotonic_ns();
-                    m.exec_ns.push_back(t_end - t_start);
                     if (s->period_ns > 0) {
-                        int64_t expected = static_cast<int64_t>(
+                        int64_t t_sched = static_cast<int64_t>(
                             s->next_release_ns - s->period_ns);
-                        m.jitter_ns.push_back(
-                            static_cast<int64_t>(t_start) - expected);
-                        if (t_end > s->next_release_ns) ++m.deadline_misses;
+                        int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
+                        m.latency_ns.push_back(lat);
+                        if (static_cast<uint64_t>(lat) > s->period_ns)
+                            ++m.deadline_misses;
                     }
                 };
 
             } else if (info.component_type == "intermediate") {
                 int pred = preds.at(id)[0];
+
                 s->execute = [v, id, pred, s, &m] {
-                    uint64_t t_start = Dispatcher::monotonic_ns();
+                    uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     v[id].store(v[pred].load(std::memory_order_relaxed) * 2.0,
                                 std::memory_order_relaxed);
 
-                    uint64_t t_end = Dispatcher::monotonic_ns();
-                    m.exec_ns.push_back(t_end - t_start);
                     if (s->period_ns > 0) {
-                        int64_t expected = static_cast<int64_t>(
+                        int64_t t_sched = static_cast<int64_t>(
                             s->next_release_ns - s->period_ns);
-                        m.jitter_ns.push_back(
-                            static_cast<int64_t>(t_start) - expected);
-                        if (t_end > s->next_release_ns) ++m.deadline_misses;
+                        int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
+                        m.latency_ns.push_back(lat);
+                        if (static_cast<uint64_t>(lat) > s->period_ns)
+                            ++m.deadline_misses;
                     }
                 };
 
-            } else { // sink — no cout, just metrics
-                int pred   = preds.at(id)[0];
-                int src_id = task_source_id.at(subtask_task_id.at(id));
-                s->execute = [v, fire, id, pred, src_id, s, &m] {
-                    uint64_t t_start = Dispatcher::monotonic_ns();
+            } else { // sink
+                int pred = preds.at(id)[0];
 
-                    (void)v[pred].load(std::memory_order_relaxed); // consume
+                s->execute = [v, pred, s, &m] {
+                    uint64_t t_actual = Dispatcher::monotonic_ns();
 
-                    uint64_t t_end = Dispatcher::monotonic_ns();
-                    m.exec_ns.push_back(t_end - t_start);
+                    (void)v[pred].load(std::memory_order_relaxed);
+
                     if (s->period_ns > 0) {
-                        int64_t expected = static_cast<int64_t>(
+                        int64_t t_sched = static_cast<int64_t>(
                             s->next_release_ns - s->period_ns);
-                        m.jitter_ns.push_back(
-                            static_cast<int64_t>(t_start) - expected);
-                        if (t_end > s->next_release_ns) ++m.deadline_misses;
+                        int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
+                        m.latency_ns.push_back(lat);
+                        if (static_cast<uint64_t>(lat) > s->period_ns)
+                            ++m.deadline_misses;
                     }
-                    uint64_t src_fire = fire[src_id].load(
-                        std::memory_order_acquire);
-                    if (src_fire > 0)
-                        m.latency_ns.push_back(
-                            static_cast<int64_t>(t_end - src_fire));
                 };
             }
         }
     }
 
     // -----------------------------------------------------------------------
-    //  8. Build DAG
+    //  7. Build DAG
     // -----------------------------------------------------------------------
     DAG dag;
     for (auto& task : plan.tasks)
@@ -268,7 +239,7 @@ int main(int argc, char* argv[]) {
         dag.add_edge(conn.upstream, conn.downstream);
 
     // -----------------------------------------------------------------------
-    //  9. TeamManager
+    //  8. TeamManager
     // -----------------------------------------------------------------------
     std::vector<TeamManager::SubtaskEntry> entries;
     for (auto& task : plan.tasks)
@@ -279,17 +250,17 @@ int main(int argc, char* argv[]) {
     tm.initialize(entries, dag);
 
     std::cout << "=== Scheduling Evaluation: " << argv[1] << " ===\n"
-              << "Tasks: "        << plan.tasks.size()
-              << "  Subtasks: "   << entries.size()
-              << "  Dispatchers: "<< tm.dispatcher_count() << "\n"
-              << "Tick: "         << min_p / 1'000'000ULL << " ms"
-              << "  LCM: "        << lcm_p / 1'000'000ULL << " ms"
-              << "  Ticks: "      << ticks
+              << "Tasks: "         << plan.tasks.size()
+              << "  Subtasks: "    << entries.size()
+              << "  Dispatchers: " << tm.dispatcher_count() << "\n"
+              << "Tick: "          << min_p / 1'000'000ULL << " ms"
+              << "  LCM: "         << lcm_p / 1'000'000ULL << " ms"
+              << "  Ticks: "       << ticks
               << "  (" << ticks * min_p / 1'000'000ULL << " ms)\n"
               << "Collecting metrics (no output during run)...\n\n";
 
     // -----------------------------------------------------------------------
-    //  10. Run
+    //  9. Run
     // -----------------------------------------------------------------------
     tm.start();
 
@@ -304,75 +275,50 @@ int main(int argc, char* argv[]) {
     tm.stop();
 
     // -----------------------------------------------------------------------
-    //  11. Report
+    //  10. Report
     // -----------------------------------------------------------------------
-    const int W = 18;
-    std::cout << std::fixed << std::setprecision(2);
+    const int W = 16;
+    std::cout << std::fixed << std::setprecision(3);
 
-    std::cout << "=== Per-subtask Metrics ===\n";
+    std::cout << "=== Latency & Jitter per Subtask ===\n";
     std::cout << std::left
               << std::setw(4)  << "ID"
               << std::setw(12) << "Period(ms)"
               << std::setw(6)  << "Core"
               << std::setw(6)  << "Prio"
               << std::setw(6)  << "Jobs"
-              << std::setw(W)  << "Jitter_mean(us)"
-              << std::setw(W)  << "Jitter_max(us)"
-              << std::setw(W)  << "Jitter_std(us)"
-              << std::setw(W)  << "Exec_mean(us)"
+              << std::setw(W)  << "Lat_min(us)"
+              << std::setw(W)  << "Lat_mean(us)"
+              << std::setw(W)  << "Lat_max(us)"
+              << std::setw(W)  << "Jitter(us)"
               << "Misses\n"
-              << std::string(6 + 12 + 6 + 6 + 6 + W*4 + 6, '-') << "\n";
+              << std::string(4 + 12 + 6 + 6 + 6 + W * 4 + 6, '-') << "\n";
+
+    int total_misses = 0;
+    int total_jobs   = 0;
 
     for (auto& [id, m] : mmap) {
+        auto& lv = m.latency_ns;
+        total_misses += m.deadline_misses;
+        total_jobs   += static_cast<int>(lv.size());
+
         std::cout << std::left
                   << std::setw(4)  << m.id
                   << std::setw(12) << (m.period_ns / 1'000'000ULL)
                   << std::setw(6)  << m.core
                   << std::setw(6)  << m.priority
-                  << std::setw(6)  << static_cast<int>(m.exec_ns.size())
-                  << std::setw(W)  << ns_to_us(vmean(m.jitter_ns))
-                  << std::setw(W)  << ns_to_us(vmax(m.jitter_ns))
-                  << std::setw(W)  << ns_to_us(vstddev(m.jitter_ns))
-                  << std::setw(W)  << ns_to_us(vmean(m.exec_ns))
+                  << std::setw(6)  << static_cast<int>(lv.size())
+                  << std::setw(W)  << ns_to_us(static_cast<double>(vmin(lv)))
+                  << std::setw(W)  << ns_to_us(mean(lv))
+                  << std::setw(W)  << ns_to_us(static_cast<double>(vmax(lv)))
+                  << std::setw(W)  << ns_to_us(static_cast<double>(jitter(lv)))
                   << m.deadline_misses << "\n";
     }
 
-    std::cout << "\n=== End-to-end Latency (source start → sink finish) ===\n";
-    std::cout << std::left
-              << std::setw(6)  << "Task"
-              << std::setw(12) << "Period(ms)"
-              << std::setw(6)  << "Jobs"
-              << std::setw(W)  << "Latency_min(us)"
-              << std::setw(W)  << "Latency_mean(us)"
-              << "Latency_max(us)\n"
-              << std::string(6 + 12 + 6 + W*3, '-') << "\n";
-
-    for (auto& task : plan.tasks) {
-        for (auto& st : task.subtasks) {
-            if (succs.find(st.id) == succs.end()) { // no successors → sink
-                auto& lv = mmap.at(st.id).latency_ns;
-                if (!lv.empty()) {
-                    std::cout << std::left
-                              << std::setw(6)  << task.id
-                              << std::setw(12) << (st.period_ns / 1'000'000ULL)
-                              << std::setw(6)  << static_cast<int>(lv.size())
-                              << std::setw(W)  << ns_to_us(vmin(lv))
-                              << std::setw(W)  << ns_to_us(vmean(lv))
-                              << ns_to_us(vmax(lv)) << "\n";
-                }
-                break;
-            }
-        }
-    }
-
-    int total_misses = 0, total_jobs = 0;
-    for (auto& [id, m] : mmap) {
-        total_misses += m.deadline_misses;
-        total_jobs   += static_cast<int>(m.exec_ns.size());
-    }
-    std::cout << "\nTotal jobs: " << total_jobs
+    std::cout << "\nTotal jobs: "      << total_jobs
               << "  Deadline misses: " << total_misses
               << "  Miss rate: "
+              << std::setprecision(2)
               << (total_jobs > 0 ? 100.0 * total_misses / total_jobs : 0.0)
               << "%\n";
 

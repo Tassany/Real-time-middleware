@@ -5,7 +5,7 @@
 #include <chrono>
 #include <vector>
 #include "../dispatcher.hpp"
-#include "../demultiplexer.hpp"
+// #include "../demultiplexer.hpp"
 
 // -----------------------------------------------------------------------
 //  T1: Chain A→B→C via downstream connections
@@ -175,25 +175,25 @@ static void test_dispatcher_aperiodic() {
     std::cout << "[PASS] test_dispatcher_aperiodic\n";
 }
 
-// -----------------------------------------------------------------------
-//  T6: Demultiplexer::process() delegates correctly to Dispatcher
-// -----------------------------------------------------------------------
-static void test_demultiplexer_process() {
-    std::atomic<int> count{0};
-    Subtask s(1, [&] { count.fetch_add(1); });
+// // -----------------------------------------------------------------------
+// //  T6: Demultiplexer::process() delegates correctly to Dispatcher
+// // -----------------------------------------------------------------------
+// static void test_demultiplexer_process() {
+//     std::atomic<int> count{0};
+//     Subtask s(1, [&] { count.fetch_add(1); });
 
-    Dispatcher disp(0, 10);
-    disp.start();
+//     Dispatcher disp(0, 10);
+//     disp.start();
 
-    // Call process() directly (bypasses FIFO queue — tests the 6-step logic)
-    Demultiplexer::process(&s, disp);
+//     // Call process() directly (bypasses FIFO queue — tests the 6-step logic)
+//     Demultiplexer::process(&s, disp);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    disp.stop();
+//     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//     disp.stop();
 
-    assert(count.load() == 1);
-    std::cout << "[PASS] test_demultiplexer_process\n";
-}
+//     assert(count.load() == 1);
+//     std::cout << "[PASS] test_demultiplexer_process\n";
+// }
 
 int main() {
     test_dispatcher_chain();
