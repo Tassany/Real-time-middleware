@@ -8,29 +8,29 @@
       "subtasks": [
         { "id": 1,  "component_type": "source",       "core": 0, "priority": 16,
           "period_ns": 1000000,  "deadline_ns": 1000000,  "output_type": "double", "config": {} },
-        { "id": 2,  "component_type": "intermediate", "core": 0, "priority": 16,
+        { "id": 2,  "component_type": "intermediate", "core": 1, "priority": 16,
           "period_ns": 1000000,  "deadline_ns": 1000000,  "output_type": "double", "config": {} },
-        { "id": 3,  "component_type": "sink",         "core": 0, "priority": 16,
+        { "id": 3,  "component_type": "sink",         "core": 2, "priority": 16,
           "period_ns": 1000000,  "deadline_ns": 1000000,  "output_type": "void",   "config": {} }
       ]
     },
     {
       "id": 2,
       "subtasks": [
-        { "id": 4,  "component_type": "source",       "core": 1, "priority": 14,
+        { "id": 4,  "component_type": "source",       "core": 0, "priority": 14,
           "period_ns": 2000000,  "deadline_ns": 2000000,  "output_type": "double", "config": {} },
         { "id": 5,  "component_type": "intermediate", "core": 1, "priority": 14,
           "period_ns": 2000000,  "deadline_ns": 2000000,  "output_type": "double", "config": {} },
-        { "id": 6,  "component_type": "sink",         "core": 1, "priority": 14,
+        { "id": 6,  "component_type": "sink",         "core": 2, "priority": 14,
           "period_ns": 2000000,  "deadline_ns": 2000000,  "output_type": "void",   "config": {} }
       ]
     },
     {
       "id": 3,
       "subtasks": [
-        { "id": 7,  "component_type": "source",       "core": 2, "priority": 12,
+        { "id": 7,  "component_type": "source",       "core": 0, "priority": 12,
           "period_ns": 6000000,  "deadline_ns": 6000000,  "output_type": "double", "config": {} },
-        { "id": 8,  "component_type": "intermediate", "core": 2, "priority": 12,
+        { "id": 8,  "component_type": "intermediate", "core": 1, "priority": 12,
           "period_ns": 6000000,  "deadline_ns": 6000000,  "output_type": "double", "config": {} },
         { "id": 9,  "component_type": "sink",         "core": 2, "priority": 12,
           "period_ns": 6000000,  "deadline_ns": 6000000,  "output_type": "void",   "config": {} }
@@ -39,33 +39,33 @@
     {
       "id": 4,
       "subtasks": [
-        { "id": 10, "component_type": "source",       "core": 3, "priority": 10,
+        { "id": 10, "component_type": "source",       "core": 0, "priority": 10,
           "period_ns": 12000000, "deadline_ns": 12000000, "output_type": "double", "config": {} },
-        { "id": 11, "component_type": "intermediate", "core": 3, "priority": 10,
+        { "id": 11, "component_type": "intermediate", "core": 1, "priority": 10,
           "period_ns": 12000000, "deadline_ns": 12000000, "output_type": "double", "config": {} },
-        { "id": 12, "component_type": "sink",         "core": 3, "priority": 10,
+        { "id": 12, "component_type": "sink",         "core": 2, "priority": 10,
           "period_ns": 12000000, "deadline_ns": 12000000, "output_type": "void",   "config": {} }
       ]
     },
     {
       "id": 5,
       "subtasks": [
-        { "id": 13, "component_type": "source",       "core": 4, "priority": 8,
+        { "id": 13, "component_type": "source",       "core": 0, "priority": 8,
           "period_ns": 24000000, "deadline_ns": 24000000, "output_type": "double", "config": {} },
-        { "id": 14, "component_type": "intermediate", "core": 4, "priority": 8,
+        { "id": 14, "component_type": "intermediate", "core": 1, "priority": 8,
           "period_ns": 24000000, "deadline_ns": 24000000, "output_type": "double", "config": {} },
-        { "id": 15, "component_type": "sink",         "core": 4, "priority": 8,
+        { "id": 15, "component_type": "sink",         "core": 2, "priority": 8,
           "period_ns": 24000000, "deadline_ns": 24000000, "output_type": "void",   "config": {} }
       ]
     },
     {
       "id": 6,
       "subtasks": [
-        { "id": 16, "component_type": "source",       "core": 5, "priority": 6,
+        { "id": 16, "component_type": "source",       "core": 0, "priority": 6,
           "period_ns": 48000000, "deadline_ns": 48000000, "output_type": "double", "config": {} },
-        { "id": 17, "component_type": "intermediate", "core": 5, "priority": 6,
+        { "id": 17, "component_type": "intermediate", "core": 1, "priority": 6,
           "period_ns": 48000000, "deadline_ns": 48000000, "output_type": "double", "config": {} },
-        { "id": 18, "component_type": "sink",         "core": 5, "priority": 6,
+        { "id": 18, "component_type": "sink",         "core": 2, "priority": 6,
           "period_ns": 48000000, "deadline_ns": 48000000, "output_type": "void",   "config": {} }
       ]
     }
