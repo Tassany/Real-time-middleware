@@ -9,7 +9,7 @@
  *            Always >= 0 in a causal system. Lower is better.
  *
  *   Jitter   = variation of the latency across jobs of the same subtask.
- *            Reported as variance (σ²) and standard deviation (σ).
+ *            Reported as peak-to-peak (max_latency - min_latency).
  *
  * How the values are derived:
  *   The dispatcher runs step 4b BEFORE calling execute():
@@ -41,15 +41,16 @@
 //  Per-subtask metrics
 // ---------------------------------------------------------------------------
 struct SubtaskMetrics {
-    int      id        = 0;
-    uint64_t period_ns = 0;
-    int      core      = 0;
-    int      priority  = 0;
+    int      id          = 0;
+    uint64_t period_ns   = 0;
+    uint64_t deadline_ns = 0;
+    int      core        = 0;
+    int      priority    = 0;
 
     // One entry per job: t_actual - t_scheduled (nanoseconds)
     std::vector<int64_t> latency_ns;
 
-    int deadline_misses = 0; // jobs where latency > period
+    int deadline_misses = 0; // jobs where latency > deadline_ns
 };
 
 // ---------------------------------------------------------------------------
@@ -143,11 +144,12 @@ int main(int argc, char* argv[]) {
         for (auto& st : task.subtasks) {
             subtask_ptrs[st.id] = std::make_unique<Subtask>(st.id, []{});
 
-            auto& m   = mmap[st.id];
-            m.id        = st.id;
-            m.period_ns = st.period_ns;
-            m.core      = st.core;
-            m.priority  = st.priority;
+            auto& m     = mmap[st.id];
+            m.id          = st.id;
+            m.period_ns   = st.period_ns;
+            m.deadline_ns = st.deadline_ns;
+            m.core        = st.core;
+            m.priority    = st.priority;
 
             // Max capacity = expected number of jobs for this period
             int cap = (st.period_ns > 0)
@@ -171,8 +173,9 @@ int main(int argc, char* argv[]) {
             auto&     m = mmap.at(id);
 
             if (info.component_type == "source") {
+                uint64_t dl = info.deadline_ns;
 
-                s->execute = [v, id, s, &m] {
+                s->execute = [v, id, s, &m, dl] {
                     uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     v[id].store(v[id].load(std::memory_order_relaxed) + 1.0,
@@ -183,15 +186,16 @@ int main(int argc, char* argv[]) {
                             s->next_release_ns - s->period_ns);
                         int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
                         m.latency_ns.push_back(lat);
-                        if (static_cast<uint64_t>(lat) > s->period_ns)
+                        if (static_cast<uint64_t>(lat) > dl)
                             ++m.deadline_misses;
                     }
                 };
 
             } else if (info.component_type == "intermediate") {
-                int pred = preds.at(id)[0];
+                int      pred = preds.at(id)[0];
+                uint64_t dl   = info.deadline_ns;
 
-                s->execute = [v, id, pred, s, &m] {
+                s->execute = [v, id, pred, s, &m, dl] {
                     uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     v[id].store(v[pred].load(std::memory_order_relaxed) * 2.0,
@@ -202,15 +206,16 @@ int main(int argc, char* argv[]) {
                             s->next_release_ns - s->period_ns);
                         int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
                         m.latency_ns.push_back(lat);
-                        if (static_cast<uint64_t>(lat) > s->period_ns)
+                        if (static_cast<uint64_t>(lat) > dl)
                             ++m.deadline_misses;
                     }
                 };
 
             } else { // sink
-                int pred = preds.at(id)[0];
+                int      pred = preds.at(id)[0];
+                uint64_t dl   = info.deadline_ns;
 
-                s->execute = [v, pred, s, &m] {
+                s->execute = [v, pred, s, &m, dl] {
                     uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     (void)v[pred].load(std::memory_order_relaxed);
@@ -220,7 +225,7 @@ int main(int argc, char* argv[]) {
                             s->next_release_ns - s->period_ns);
                         int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
                         m.latency_ns.push_back(lat);
-                        if (static_cast<uint64_t>(lat) > s->period_ns)
+                        if (static_cast<uint64_t>(lat) > dl)
                             ++m.deadline_misses;
                     }
                 };
@@ -264,8 +269,10 @@ int main(int argc, char* argv[]) {
     // -----------------------------------------------------------------------
     tm.start();
 
+    auto t_next = std::chrono::steady_clock::now();
     for (int tick = 1; tick <= ticks; ++tick) {
-        std::this_thread::sleep_for(std::chrono::nanoseconds(min_p));
+        t_next += std::chrono::nanoseconds(min_p);
+        std::this_thread::sleep_until(t_next);
         for (auto& [id, p] : sources)
             if (static_cast<uint64_t>(tick) % (p / min_p) == 0)
                 tm.notify(id);
