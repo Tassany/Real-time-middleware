@@ -34,6 +34,7 @@
 #include <numeric>
 #include <map>
 #include <memory>
+#include <fstream>
 #include <vector>
 #include "team_manager.hpp"
 #include "parser_json.hpp"
@@ -289,7 +290,24 @@ int main(int argc, char* argv[]) {
     tm.stop();
 
     // -----------------------------------------------------------------------
-    //  10. Report
+    //  10. Export raw latency samples to CSV
+    // -----------------------------------------------------------------------
+    {
+        std::ofstream csv("latency_samples.csv");
+        csv << "subtask_id,period_ms,core,priority,latency_us\n";
+        csv << std::fixed << std::setprecision(3);
+        for (auto& [id, m] : mmap)
+            for (auto lat : m.latency_ns)
+                csv << m.id << ','
+                    << (m.period_ns / 1'000'000ULL) << ','
+                    << m.core << ','
+                    << m.priority << ','
+                    << (lat / 1000.0) << '\n';
+        std::cout << "Raw samples written to latency_samples.csv\n\n";
+    }
+
+    // -----------------------------------------------------------------------
+    //  11. Report
     // -----------------------------------------------------------------------
     const int W = 16;
     std::cout << std::fixed << std::setprecision(3);
