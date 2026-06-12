@@ -29,6 +29,7 @@
 #include <sched.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -94,7 +95,7 @@ class Dispatcher {
 public:
     Dispatcher(int core, int priority)
         : core_(core), priority_(priority),
-          efd_(-1), epfd_(-1), idle_efd_(-1), running_(false) {}
+          efd_(-1), epfd_(-1), idle_efd_(-1), timerfd_(-1), running_(false) {}
 
     ~Dispatcher() { stop(); }
 
@@ -124,6 +125,7 @@ public:
         efd_      = eventfd(0, EFD_SEMAPHORE);
         epfd_     = epoll_create1(0);
         idle_efd_ = eventfd(0, EFD_SEMAPHORE);
+        timerfd_  = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
 
         struct epoll_event ev{};
         ev.events  = EPOLLIN;
@@ -152,6 +154,7 @@ public:
         close(efd_);      efd_      = -1;
         close(epfd_);     epfd_     = -1;
         close(idle_efd_); idle_efd_ = -1;
+        close(timerfd_);  timerfd_  = -1;
 
         pthread_mutex_destroy(&queue_mutex_);
         pthread_mutex_destroy(&timer_mutex_);
@@ -175,16 +178,18 @@ public:
 
         // Steps 3 & 4a: check if release time has arrived
         if (s->period_ns > 0 && s->next_release_ns > 0 && now < s->next_release_ns) {
-            // Defer: push into timer queue; idle thread will re-submit when ready
+            // Defer: push into timer queue; arm timerfd at the earliest release time
             s->in_processing.store(false);
 
             pthread_mutex_lock(&timer_mutex_);
             timer_queue_.push({s->next_release_ns, s});
+            uint64_t earliest = timer_queue_.top().release_ns;
             pthread_mutex_unlock(&timer_mutex_);
 
-            // Wake the idle thread so it can sleep-until the right moment
-            uint64_t sig = 1;
-            ::write(idle_efd_, &sig, sizeof(sig));
+            struct itimerspec its{};
+            its.it_value.tv_sec  = earliest / 1'000'000'000ULL;
+            its.it_value.tv_nsec = earliest % 1'000'000'000ULL;
+            timerfd_settime(timerfd_, TFD_TIMER_ABSTIME, &its, nullptr);
             return;
         }
 
@@ -296,16 +301,17 @@ private:
         ev.events  = EPOLLIN;
         ev.data.fd = idle_efd_;
         epoll_ctl(idle_epfd, EPOLL_CTL_ADD, idle_efd_, &ev);
+        ev.data.fd = timerfd_;
+        epoll_ctl(idle_epfd, EPOLL_CTL_ADD, timerfd_, &ev);
 
-        struct epoll_event events[1];
+        struct epoll_event events[2];
         while (running_) {
-            // Short timeout so we periodically check expired timers even if
-            // no explicit signal arrives (handles race between timer expiry
-            // and idle_efd_ write).
-            int n = epoll_wait(idle_epfd, events, 1, /*timeout_ms=*/10);
-            if (n > 0) {
+            // timerfd fires at the exact next_release_ns; idle_efd_ handles shutdown.
+            // 10ms fallback catches any edge-case races.
+            int n = epoll_wait(idle_epfd, events, 2, /*timeout_ms=*/10);
+            for (int i = 0; i < n; ++i) {
                 uint64_t val;
-                ::read(idle_efd_, &val, sizeof(val)); // drain one token
+                ::read(events[i].data.fd, &val, sizeof(val)); // drain token
             }
 
             dispatch_expired_timers();
@@ -326,6 +332,7 @@ private:
     int efd_;
     int epfd_;
     int idle_efd_;
+    int timerfd_;
 
     std::atomic<bool>    running_;
     std::queue<Subtask*> queue_;

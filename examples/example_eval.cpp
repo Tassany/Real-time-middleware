@@ -8,8 +8,8 @@
  *              minus the time it was supposed to start.
  *            Always >= 0 in a causal system. Lower is better.
  *
- *   Jitter   = variation of the latency across jobs of the same subtask.
- *            Reported as peak-to-peak (max_latency - min_latency).
+ *   Jitter   = peak-to-peak variation of the latency across jobs of the same subtask.
+ *            Reported as max_latency - min_latency (μs).
  *
  * How the values are derived:
  *   The dispatcher runs step 4b BEFORE calling execute():
@@ -29,6 +29,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <time.h>
 #include <algorithm>
 #include <numeric>
 #include <map>
@@ -269,13 +270,19 @@ int main(int argc, char* argv[]) {
     // -----------------------------------------------------------------------
     tm.start();
 
-    auto t_next = std::chrono::steady_clock::now();
+    // Use absolute-time sleep so per-tick overshoots don't accumulate.
+    uint64_t next_tick_ns = Dispatcher::monotonic_ns() + min_p;
     for (int tick = 1; tick <= ticks; ++tick) {
-        t_next += std::chrono::nanoseconds(min_p);
-        std::this_thread::sleep_until(t_next);
+        struct timespec ts;
+        ts.tv_sec  = next_tick_ns / 1'000'000'000ULL;
+        ts.tv_nsec = next_tick_ns % 1'000'000'000ULL;
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
+
         for (auto& [id, p] : sources)
             if (static_cast<uint64_t>(tick) % (p / min_p) == 0)
                 tm.notify(id);
+
+        next_tick_ns += min_p;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
