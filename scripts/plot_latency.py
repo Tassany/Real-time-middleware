@@ -44,7 +44,7 @@ def make_boxplot(ax, groups, labels, colors, title, xlabel):
 meta = (
     df.groupby("subtask_id")
     .agg(period_ms=("period_ms", "first"), core=("core", "first"), priority=("priority", "first"))
-    .sort_values(["period_ms", "subtask_id"])
+    .sort_values(["core", "period_ms", "subtask_id"])   # grouped by core first
 )
 
 periods = sorted(meta["period_ms"].unique())
@@ -58,6 +58,19 @@ colors1   = [period_color[meta.loc[sid, "period_ms"]] for sid in subtask_ids]
 fig1, ax1 = plt.subplots(figsize=(max(9, len(subtask_ids) * 1.3), 5))
 make_boxplot(ax1, groups1, labels1, colors1,
              "Scheduling Latency per Subtask", "Subtask  (period · core)")
+
+# Vertical separators and core labels between groups
+cores_order = meta["core"].unique()          # in sorted order (core asc)
+pos = 0
+for c in cores_order:
+    count = (meta["core"] == c).sum()
+    mid   = pos + count / 2 + 0.5           # centre of this core's group (1-indexed x)
+    ax1.axvline(pos + 0.5, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax1.text(mid, ax1.get_ylim()[1], f"Core {c}",
+             ha="center", va="bottom", fontsize=8, color="gray")
+    pos += count
+ax1.axvline(pos + 0.5, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+
 ax1.legend(
     handles=[mpatches.Patch(facecolor=period_color[p], alpha=0.75, label=f"{int(p)} ms") for p in periods],
     title="Period", loc="upper right", fontsize=8,
