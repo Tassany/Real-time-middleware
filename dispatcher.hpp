@@ -33,13 +33,19 @@
 #include <unistd.h>
 #include <time.h>
 
-class Dispatcher; // forward declaration for SubtaskConn
+// Abstract notification interface — implemented by both Dispatcher and
+// PreemptiveDispatcher so SubtaskConn can hold either without casting.
+class IDispatcher {
+public:
+    virtual void notify(struct Subtask* s) = 0;
+    virtual ~IDispatcher() = default;
+};
 
 // -----------------------------------------------------------------------
 //  Downstream connection descriptor
 // -----------------------------------------------------------------------
 struct SubtaskConn {
-    Dispatcher*    dispatcher;
+    IDispatcher*    dispatcher;
     struct Subtask* subtask;
 };
 
@@ -91,7 +97,7 @@ using TimerQueue = std::priority_queue<TimerEntry,
 // -----------------------------------------------------------------------
 //  Dispatcher
 // -----------------------------------------------------------------------
-class Dispatcher {
+class Dispatcher : public IDispatcher {
 public:
     Dispatcher(int core, int priority)
         : core_(core), priority_(priority),
@@ -108,7 +114,7 @@ public:
      * all fan_in_total suppliers have signalled for this job.
      * Thread-safe; may be called from any thread.
      */
-    void notify(Subtask* s) {
+    void notify(Subtask* s) override {
         int received = s->fan_in_received.fetch_add(1) + 1;
         if (received < s->fan_in_total) return;  // still waiting for more suppliers
         s->fan_in_received.store(0);              // reset for the next job
