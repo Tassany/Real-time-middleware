@@ -50,6 +50,15 @@ example_from_plan: $(EXAMPLES_DIR)/example_from_plan.cpp team_manager.cpp team_m
 example_eval: $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp team_manager.hpp dag.cpp parser_json.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp dag.cpp parser_json.cpp
 
+example_bin_packing: $(EXAMPLES_DIR)/example_bin_packing.cpp parser_json.cpp dag.cpp allocator.hpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(EXAMPLES_DIR)/example_bin_packing.cpp parser_json.cpp dag.cpp
+
+example_saturation: $(EXAMPLES_DIR)/example_saturation.cpp allocator.hpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(EXAMPLES_DIR)/example_saturation.cpp
+
+example_heuristic_eval: $(EXAMPLES_DIR)/example_heuristic_eval.cpp team_manager.cpp team_manager.hpp dag.cpp allocator.hpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_heuristic_eval.cpp team_manager.cpp dag.cpp
+
 example_eval_preemptive: $(EXAMPLES_DIR)/example_eval_preemptive.cpp preemptive_team_manager.cpp preemptive_team_manager.hpp preemptive_dispatcher.hpp dag.cpp parser_json.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_eval_preemptive.cpp preemptive_team_manager.cpp dag.cpp parser_json.cpp
 
@@ -110,7 +119,8 @@ clean:
 	rm -f $(TARGET) $(TESTS_BINS) \
 	      example_ring example_eventfd example_two_threads example_dispatcher \
 	      example_epoll example_pipeline example_team_manager example_full_pipeline \
-	      example_from_plan example_eval codegen
+	      example_from_plan example_eval example_bin_packing \
+	      example_saturation example_heuristic_eval codegen
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 
 .PHONY: clean examples tests test codegen_run
