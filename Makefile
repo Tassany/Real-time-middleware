@@ -59,6 +59,12 @@ example_saturation: $(EXAMPLES_DIR)/example_saturation.cpp allocator.hpp $(HDRS)
 example_heuristic_eval: $(EXAMPLES_DIR)/example_heuristic_eval.cpp team_manager.cpp team_manager.hpp dag.cpp allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_heuristic_eval.cpp team_manager.cpp dag.cpp
 
+example_wcet_measure: $(EXAMPLES_DIR)/example_wcet_measure.cpp wcet_components/wcet_components_rt.hpp
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_wcet_measure.cpp
+
+example_heuristic_eval_measured: $(EXAMPLES_DIR)/example_heuristic_eval_measured.cpp team_manager.cpp team_manager.hpp dag.cpp allocator.hpp wcet_components/wcet_components_rt.hpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_heuristic_eval_measured.cpp team_manager.cpp dag.cpp
+
 example_eval_preemptive: $(EXAMPLES_DIR)/example_eval_preemptive.cpp preemptive_team_manager.cpp preemptive_team_manager.hpp preemptive_dispatcher.hpp dag.cpp parser_json.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_eval_preemptive.cpp preemptive_team_manager.cpp dag.cpp parser_json.cpp
 
@@ -120,7 +126,8 @@ clean:
 	      example_ring example_eventfd example_two_threads example_dispatcher \
 	      example_epoll example_pipeline example_team_manager example_full_pipeline \
 	      example_from_plan example_eval example_bin_packing \
-	      example_saturation example_heuristic_eval codegen
+	      example_saturation example_heuristic_eval example_wcet_measure \
+	      example_heuristic_eval_measured codegen
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 
 .PHONY: clean examples tests test codegen_run
