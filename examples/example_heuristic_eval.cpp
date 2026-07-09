@@ -18,16 +18,19 @@
  *   Tipo 4: período 24ms, prioridade 20
  *   Tipo 5: período 48ms, prioridade  6
  *
- * Estratégia de medição:
- *   - Tick loop a cada 1ms (menor período); cada grupo dispara quando
- *     tick % (período/1ms) == 0.
- *   - fire_time[g] guarda o instante em que o grupo g foi notificado no tick
- *     corrente; todos os estágios (source, intermediate, sink) do grupo g
- *     medem latência relativa a esse zero.
- *   - Subtasks rodam em modo aperiódico (period_ns=0 no Subtask) para evitar
- *     drift de next_release_ns com múltiplos subtasks por core.
- *   - Warmup = 3 ciclos do LCM (144ms); Medição = 10 ciclos (480ms).
+ * Estratégia de medição (idêntica a examples/example_eval.cpp, para que os
+ * números sejam diretamente comparáveis no artigo):
+ *   - Cada subtask mantém seu period_ns real; o release-guard de 6 passos do
+ *     Dispatcher (dispatcher.hpp) fica ativo para todos os estágios.
+ *   - Latência de cada job é medida dentro do próprio execute(), usando o
+ *     estado do release-guard: t_sched = next_release_ns - period_ns,
+ *     lat = t_actual - t_sched. Não há "fire_time" externo por grupo.
+ *   - Janela de medição dinâmica: min_p = menor período entre as fontes
+ *     (subtasks sem predecessor); lcm_p = LCM de todos os períodos de fonte;
+ *     ticks = 4 × lcm_p / min_p. Sem descarte de warmup — mede desde o tick 1.
  *   - Jitter = lat_max − lat_min (peak-to-peak).
+ *   - Amostras brutas de cada heurística são exportadas para
+ *     latency_heuristic_<nome>.csv, no mesmo formato de latency_samples.csv.
  */
 
 #include <iostream>
@@ -41,6 +44,9 @@
 #include <chrono>
 #include <thread>
 #include <time.h>
+#include <fstream>
+#include <numeric>
+#include <cctype>
 
 #include "deployment_plan.hpp"
 #include "allocator.hpp"
@@ -49,11 +55,14 @@
 #include "dispatcher.hpp"
 
 // ---------------------------------------------------------------------------
-//  WCET por tipo de componente (Heptane MIPS 100 MHz — docs/wcet_heptane.md)
+//  WCET por tipo de componente (Heptane, ARM, ciclos — sem conversão de
+//  frequência: valores usados como estão, direto em allocator::utilization())
+//  source=bs.c/binary_search, intermediate=jfdctint.c/jpeg_fdct_islow,
+//  sink=sqrt.c/my_sqrt
 // ---------------------------------------------------------------------------
-static constexpr uint64_t WCET_SOURCE       = 240840;
-static constexpr uint64_t WCET_INTERMEDIATE = 354240;
-static constexpr uint64_t WCET_SINK         = 352160;
+static constexpr uint64_t WCET_SOURCE       = 3761;
+static constexpr uint64_t WCET_INTERMEDIATE = 74474;
+static constexpr uint64_t WCET_SINK         = 29931;
 
 // ---------------------------------------------------------------------------
 //  Tipos de task (ciclo de 6, igual ao deployment_plan.json)
@@ -72,11 +81,6 @@ static constexpr TaskType TASK_TYPES[] = {
     { 48'000'000,  6 },
 };
 static constexpr int      NUM_TASK_TYPES = 6;
-static constexpr uint64_t MIN_PERIOD_NS  = 1'000'000;   // 1ms — menor período
-static constexpr uint64_t LCM_NS         = 48'000'000;  // LCM(1,2,6,12,24,48)ms
-static constexpr int      LCM_TICKS      = static_cast<int>(LCM_NS / MIN_PERIOD_NS); // 48
-static constexpr int      WARMUP_TICKS   = 3  * LCM_TICKS;  // 144 ticks = 144 ms
-static constexpr int      MEASURE_TICKS  = 10 * LCM_TICKS;  // 480 ticks = 480 ms
 
 // ---------------------------------------------------------------------------
 //  Resultado agregado de uma rodada de avaliação
@@ -136,7 +140,23 @@ static std::vector<ConnectionInfo> make_connections(int num_groups) {
 }
 
 // ---------------------------------------------------------------------------
+//  Slugifica o nome da heurística para usar como nome de arquivo CSV
+// ---------------------------------------------------------------------------
+static std::string slugify(const std::string& name) {
+    std::string out = name;
+    for (auto& c : out)
+        c = (c == ' ') ? '_' : static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 //  Executa uma rodada completa e retorna métricas agregadas
+//
+//  Medição idêntica a examples/example_eval.cpp: period_ns de cada subtask
+//  fica intacto (release-guard real do Dispatcher ativo), e a latência de
+//  cada job é computada inline em execute() como
+//  t_actual - (next_release_ns - period_ns) — sem fire_time externo por
+//  grupo e sem descarte de warmup.
 // ---------------------------------------------------------------------------
 static EvalResult run_eval(const std::string& heuristic_name,
                            const AllocationResult& alloc,
@@ -145,17 +165,6 @@ static EvalResult run_eval(const std::string& heuristic_name,
     const auto& subtasks = alloc.subtasks;
     int max_id = 0;
     for (const auto& s : subtasks) max_id = std::max(max_id, s.id);
-
-    int num_groups = static_cast<int>(subtasks.size()) / 3;
-
-    // fire_time[g]: instante em que o grupo g foi disparado no tick corrente.
-    // Todos os estágios do grupo medem latência relativa a esse zero.
-    auto fire_buf = std::make_unique<std::atomic<uint64_t>[]>(num_groups);
-    for (int i = 0; i < num_groups; ++i) fire_buf[i].store(0, std::memory_order_relaxed);
-    auto* fire_time = fire_buf.get();
-
-    // Ativado após os ticks de warmup; lambdas ignoram amostras antes disso.
-    std::atomic<bool> measuring{false};
 
     // Slots de dados compartilhados (simulação do pipeline)
     auto vals_buf = std::make_unique<std::atomic<double>[]>(max_id + 1);
@@ -166,8 +175,26 @@ static EvalResult run_eval(const std::string& heuristic_name,
     std::map<int, std::vector<int>> preds;
     for (const auto& c : conns) preds[c.downstream].push_back(c.upstream);
 
+    // Fontes: subtasks sem predecessor (mesmo critério de example_eval.cpp)
+    std::vector<std::pair<int, uint64_t>> sources;
+    for (const auto& s : subtasks)
+        if (preds.find(s.id) == preds.end())
+            sources.push_back({ s.id, s.period_ns });
+
+    uint64_t min_p = sources[0].second;
+    for (auto& [id, p] : sources) min_p = std::min(min_p, p);
+
+    uint64_t lcm_p = sources[0].second;
+    for (std::size_t i = 1; i < sources.size(); ++i)
+        lcm_p = std::lcm(lcm_p, sources[i].second);
+
+    int ticks = static_cast<int>(4 * lcm_p / min_p);
+
     // Métricas por subtask
     struct Metrics {
+        uint64_t period_ns = 0;
+        int      core      = 0;
+        int      priority  = 0;
         std::vector<int64_t> latency_ns;
         int64_t min_lat = std::numeric_limits<int64_t>::max();
         int64_t max_lat = std::numeric_limits<int64_t>::min();
@@ -176,11 +203,16 @@ static EvalResult run_eval(const std::string& heuristic_name,
     };
     std::map<int, Metrics> mmap;
 
-    int ticks = WARMUP_TICKS + MEASURE_TICKS;
-
     for (const auto& s : subtasks) {
-        // reserva máximo: 1ms group dispara MEASURE_TICKS vezes
-        mmap[s.id].latency_ns.reserve(MEASURE_TICKS + 4);
+        auto& m    = mmap[s.id];
+        m.period_ns = s.period_ns;
+        m.core      = s.core;
+        m.priority  = s.priority;
+
+        int cap = (s.period_ns > 0)
+            ? static_cast<int>(4 * lcm_p / s.period_ns) + 4
+            : ticks + 4;
+        m.latency_ns.reserve(static_cast<std::size_t>(cap));
     }
 
     // Objetos Subtask
@@ -188,47 +220,70 @@ static EvalResult run_eval(const std::string& heuristic_name,
     for (const auto& s : subtasks)
         subtask_ptrs[s.id] = std::make_unique<Subtask>(s.id, []{});
 
-    // Lambdas de execução — latência medida relativa a fire_time[gid]
+    // Lambdas de execução — latência medida via release-guard real do próprio
+    // subtask (igual a example_eval.cpp), não via fire_time de grupo.
     for (const auto& info : subtasks) {
-        int      id  = info.id;
-        int      gid = info.task_id - 1;  // índice do grupo (0-based)
-        Subtask* s   = subtask_ptrs.at(id).get();
-        auto&    m   = mmap.at(id);
-        uint64_t dl  = info.deadline_ns;
-
-        auto record = [&m, fire_time, gid, dl, &measuring](uint64_t t) {
-            if (!measuring.load(std::memory_order_relaxed)) return;
-            int64_t lat = static_cast<int64_t>(t)
-                        - static_cast<int64_t>(fire_time[gid].load(std::memory_order_relaxed));
-            if (lat < 0) return; // amostra de ciclo anterior — descarta
-            m.latency_ns.push_back(lat);
-            m.sum_lat += lat;
-            if (lat < m.min_lat) m.min_lat = lat;
-            if (lat > m.max_lat) m.max_lat = lat;
-            if (static_cast<uint64_t>(lat) > dl) ++m.misses;
-        };
+        int      id = info.id;
+        Subtask*  s = subtask_ptrs.at(id).get();
+        auto&     m = mmap.at(id);
+        uint64_t dl = info.deadline_ns;
 
         if (info.component_type == "source") {
-            s->execute = [v, id, record] {
-                uint64_t t = Dispatcher::monotonic_ns();
+            s->execute = [v, id, s, &m, dl] {
+                uint64_t t_actual = Dispatcher::monotonic_ns();
+
                 v[id].store(v[id].load(std::memory_order_relaxed) + 1.0,
                             std::memory_order_relaxed);
-                record(t);
+
+                if (s->period_ns > 0) {
+                    int64_t t_sched = static_cast<int64_t>(
+                        s->next_release_ns - s->period_ns);
+                    int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
+                    m.latency_ns.push_back(lat);
+                    m.sum_lat += lat;
+                    if (lat < m.min_lat) m.min_lat = lat;
+                    if (lat > m.max_lat) m.max_lat = lat;
+                    if (static_cast<uint64_t>(lat) > dl) ++m.misses;
+                }
             };
+
         } else if (info.component_type == "intermediate") {
             int pred = preds.at(id)[0];
-            s->execute = [v, id, pred, record] {
-                uint64_t t = Dispatcher::monotonic_ns();
+            s->execute = [v, id, pred, s, &m, dl] {
+                uint64_t t_actual = Dispatcher::monotonic_ns();
+
                 v[id].store(v[pred].load(std::memory_order_relaxed) * 2.0,
                             std::memory_order_relaxed);
-                record(t);
+
+                if (s->period_ns > 0) {
+                    int64_t t_sched = static_cast<int64_t>(
+                        s->next_release_ns - s->period_ns);
+                    int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
+                    m.latency_ns.push_back(lat);
+                    m.sum_lat += lat;
+                    if (lat < m.min_lat) m.min_lat = lat;
+                    if (lat > m.max_lat) m.max_lat = lat;
+                    if (static_cast<uint64_t>(lat) > dl) ++m.misses;
+                }
             };
+
         } else { // sink
             int pred = preds.at(id)[0];
-            s->execute = [v, pred, record] {
-                uint64_t t = Dispatcher::monotonic_ns();
+            s->execute = [v, pred, s, &m, dl] {
+                uint64_t t_actual = Dispatcher::monotonic_ns();
+
                 (void)v[pred].load(std::memory_order_relaxed);
-                record(t);
+
+                if (s->period_ns > 0) {
+                    int64_t t_sched = static_cast<int64_t>(
+                        s->next_release_ns - s->period_ns);
+                    int64_t lat = static_cast<int64_t>(t_actual) - t_sched;
+                    m.latency_ns.push_back(lat);
+                    m.sum_lat += lat;
+                    if (lat < m.min_lat) m.min_lat = lat;
+                    if (lat > m.max_lat) m.max_lat = lat;
+                    if (static_cast<uint64_t>(lat) > dl) ++m.misses;
+                }
             };
         }
     }
@@ -238,46 +293,47 @@ static EvalResult run_eval(const std::string& heuristic_name,
     for (const auto& s : subtasks) dag.add_node(s.id, nullptr);
     for (const auto& c : conns)    dag.add_edge(c.upstream, c.downstream);
 
-    // Entradas do TeamManager (usa period_ns original para sizing do ring buffer)
+    // Entradas do TeamManager — period_ns real preservado (release-guard ativo)
     std::vector<TeamManager::SubtaskEntry> entries;
     for (const auto& s : subtasks)
         entries.push_back({ s, subtask_ptrs.at(s.id).get() });
 
     TeamManager tm;
     tm.initialize(entries, dag);
-
-    // Desabilita o release-guard periódico: subtasks disparam na chegada de
-    // notify(), sem drift de next_release_ns entre subtasks no mesmo core.
-    for (const auto& s : subtasks)
-        subtask_ptrs.at(s.id)->period_ns = 0;
-
     tm.start();
 
-    // Tick loop — 1 tick por ms; cada grupo dispara quando tick % ratio == 0
-    uint64_t next_tick = Dispatcher::monotonic_ns() + MIN_PERIOD_NS;
+    // Tick loop — igual a example_eval.cpp: sleep absoluto no menor período,
+    // notifica cada fonte quando seu período divide o tick corrente.
+    uint64_t next_tick = Dispatcher::monotonic_ns() + min_p;
     for (int tick = 1; tick <= ticks; ++tick) {
         struct timespec ts;
         ts.tv_sec  = next_tick / 1'000'000'000ULL;
         ts.tv_nsec = next_tick % 1'000'000'000ULL;
         clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
 
-        if (tick > WARMUP_TICKS)
-            measuring.store(true, std::memory_order_relaxed);
+        for (auto& [id, p] : sources)
+            if (static_cast<uint64_t>(tick) % (p / min_p) == 0)
+                tm.notify(id);
 
-        for (int g = 0; g < num_groups; ++g) {
-            uint64_t period_g = subtasks[static_cast<size_t>(g * 3)].period_ns;
-            uint64_t ratio    = period_g / MIN_PERIOD_NS;
-            if (static_cast<uint64_t>(tick) % ratio == 0) {
-                fire_time[g].store(Dispatcher::monotonic_ns(), std::memory_order_relaxed);
-                tm.notify(g * 3 + 1);
-            }
-        }
-
-        next_tick += MIN_PERIOD_NS;
+        next_tick += min_p;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     tm.stop();
+
+    // Exporta amostras brutas — mesmo formato de latency_samples.csv
+    {
+        std::ofstream csv("latency_heuristic_" + slugify(heuristic_name) + ".csv");
+        csv << "subtask_id,period_ms,core,priority,latency_us\n";
+        csv << std::fixed << std::setprecision(3);
+        for (auto& [id, m] : mmap)
+            for (auto lat : m.latency_ns)
+                csv << id << ','
+                    << (m.period_ns / 1'000'000ULL) << ','
+                    << m.core << ','
+                    << m.priority << ','
+                    << (lat / 1000.0) << '\n';
+    }
 
     // Agregação
     int64_t all_min = std::numeric_limits<int64_t>::max();
@@ -373,7 +429,7 @@ int main(int argc, char* argv[]) {
               << "Task types: " << NUM_TASK_TYPES << " (";
     for (int i = 0; i < NUM_TASK_TYPES; ++i)
         std::cout << TASK_TYPES[i].period_ns / 1'000'000 << "ms" << (i < NUM_TASK_TYPES-1 ? "," : "");
-    std::cout << ") | Warmup: " << WARMUP_TICKS << "ms | Measurement: " << MEASURE_TICKS << "ms\n"
+    std::cout << ")\n"
               << std::fixed << std::setprecision(4)
               << "Total util: " << total_util << " / " << num_cores << ".0000\n";
 

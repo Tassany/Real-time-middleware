@@ -24,6 +24,7 @@ struct SubtaskInfo {
     int         priority;
     uint64_t    period_ns;
     uint64_t    deadline_ns;
+    uint64_t    wcet_ns = 0;    // worst-case execution time; 0 = not set
     json        config;
 };
 
