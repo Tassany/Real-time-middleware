@@ -47,12 +47,15 @@
 #include <fstream>
 #include <numeric>
 #include <cctype>
+#include <array>
+#include <cmath>
 
 #include "deployment_plan.hpp"
 #include "allocator.hpp"
 #include "team_manager.hpp"
 #include "dag.hpp"
 #include "dispatcher.hpp"
+#include "wcet_components/wcet_components_rt.hpp"
 
 // ---------------------------------------------------------------------------
 //  WCET por tipo de componente (Heptane, ARM, ciclos — sem conversão de
@@ -220,8 +223,26 @@ static EvalResult run_eval(const std::string& heuristic_name,
     for (const auto& s : subtasks)
         subtask_ptrs[s.id] = std::make_unique<Subtask>(s.id, []{});
 
+    // Buffer próprio por instância "intermediate" (jpeg_fdct_islow opera
+    // in-place; cada subtask precisa do seu próprio array, senão instâncias
+    // concorrentes em cores diferentes corrompem o mesmo estado).
+    std::map<int, std::unique_ptr<std::array<int, 64>>> dct_state;
+    for (const auto& s : subtasks) {
+        if (s.component_type != "intermediate") continue;
+        auto buf = std::make_unique<std::array<int, 64>>();
+        int seed = 1;
+        for (int i = 0; i < 64; ++i) {
+            seed = (seed * 133 + 81) % 65535;
+            (*buf)[static_cast<std::size_t>(i)] = seed;
+        }
+        dct_state[s.id] = std::move(buf);
+    }
+
     // Lambdas de execução — latência medida via release-guard real do próprio
-    // subtask (igual a example_eval.cpp), não via fire_time de grupo.
+    // subtask (igual a example_eval.cpp), não via fire_time de grupo. O corpo
+    // de cada estágio agora roda o código real analisado pelo Heptane
+    // (wcet_components/{source,intermediate,sink}.c, ver
+    // wcet_components_rt.hpp), não mais um cálculo trivial.
     for (const auto& info : subtasks) {
         int      id = info.id;
         Subtask*  s = subtask_ptrs.at(id).get();
@@ -232,8 +253,8 @@ static EvalResult run_eval(const std::string& heuristic_name,
             s->execute = [v, id, s, &m, dl] {
                 uint64_t t_actual = Dispatcher::monotonic_ns();
 
-                v[id].store(v[id].load(std::memory_order_relaxed) + 1.0,
-                            std::memory_order_relaxed);
+                int r = wcet_rt::binary_search_run(8); // mesma chave do main() de bs.c
+                v[id].store(static_cast<double>(r), std::memory_order_relaxed);
 
                 if (s->period_ns > 0) {
                     int64_t t_sched = static_cast<int64_t>(
@@ -249,11 +270,13 @@ static EvalResult run_eval(const std::string& heuristic_name,
 
         } else if (info.component_type == "intermediate") {
             int pred = preds.at(id)[0];
-            s->execute = [v, id, pred, s, &m, dl] {
+            std::array<int, 64>* dct = dct_state.at(id).get();
+            s->execute = [v, id, pred, s, &m, dl, dct] {
                 uint64_t t_actual = Dispatcher::monotonic_ns();
 
-                v[id].store(v[pred].load(std::memory_order_relaxed) * 2.0,
-                            std::memory_order_relaxed);
+                (void)v[pred].load(std::memory_order_relaxed);
+                wcet_rt::dct_run(dct->data());
+                v[id].store(static_cast<double>((*dct)[0]), std::memory_order_relaxed);
 
                 if (s->period_ns > 0) {
                     int64_t t_sched = static_cast<int64_t>(
@@ -272,7 +295,9 @@ static EvalResult run_eval(const std::string& heuristic_name,
             s->execute = [v, pred, s, &m, dl] {
                 uint64_t t_actual = Dispatcher::monotonic_ns();
 
-                (void)v[pred].load(std::memory_order_relaxed);
+                float val = std::fabs(static_cast<float>(
+                    v[pred].load(std::memory_order_relaxed))) + 1.0f;
+                (void)wcet_rt::sqrt_run(val);
 
                 if (s->period_ns > 0) {
                     int64_t t_sched = static_cast<int64_t>(
