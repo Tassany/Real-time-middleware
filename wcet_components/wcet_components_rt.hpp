@@ -117,9 +117,10 @@ inline void dct_run(int dataptr[64]) {
     std::int32_t tmp10, tmp11, tmp12, tmp13;
     std::int32_t z1, z2, z3, z4, z5;
     int ctr;
-    for(int i = 0; i < 100000; ++i){
-        int a = 0 +1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
-    }
+    //lembrar
+    // for(int i = 0; i < 100000; ++i){
+    //     int a = 0 +1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
+    // }
     // Pass 1: process rows.
     for (ctr = WCET_RT_DCTSIZE - 1; ctr >= 0; ctr--) {
         tmp0 = dataptr[0] + dataptr[7];
