@@ -115,7 +115,7 @@ static std::vector<SubtaskInfo> make_subtasks(int num_groups) {
             s.id             = id++;
             s.task_id        = g + 1;
             s.component_type = type;
-            s.core           = 4; // placeholder, heurística vai atribuir
+            s.core           = 3; // placeholder, heurística vai atribuir
             s.priority       = tt.priority;
             s.period_ns      = tt.period_ns;
             s.deadline_ns    = tt.period_ns;
@@ -196,7 +196,7 @@ static EvalResult run_eval(const std::string& heuristic_name,
     // Métricas por subtask
     struct Metrics {
         uint64_t period_ns = 0;
-        int      core      = 4; // placeholder, heurística vai atribuir
+        int      core      = 3; // placeholder, heurística vai atribuir
         int      priority  = 0;
         std::vector<int64_t> latency_ns;
         int64_t min_lat = std::numeric_limits<int64_t>::max();
