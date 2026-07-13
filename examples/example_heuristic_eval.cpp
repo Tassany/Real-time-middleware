@@ -86,14 +86,6 @@ static constexpr TaskType TASK_TYPES[] = {
 static constexpr int      NUM_TASK_TYPES = 6;
 
 // ---------------------------------------------------------------------------
-//  Core físico base: o allocator atribui cores lógicos 0..num_cores-1, mas
-//  o Dispatcher usa esse índice direto em CPU_SET(). Somamos PHYS_CORE_BASE
-//  para deslocar toda a execução para os cores físicos desejados.
-//  Com PHYS_CORE_BASE=3 e num_cores=1 → tudo roda apenas no core físico 3.
-// ---------------------------------------------------------------------------
-static constexpr int      PHYS_CORE_BASE = 3;
-
-// ---------------------------------------------------------------------------
 //  Resultado agregado de uma rodada de avaliação
 // ---------------------------------------------------------------------------
 struct EvalResult {
@@ -491,15 +483,7 @@ int main(int argc, char* argv[]) {
             results.push_back(r);
             continue;
         }
-        // Desloca os cores lógicos (0..num_cores-1) para os físicos desejados,
-        // começando em PHYS_CORE_BASE. Assim a execução fica confinada aos
-        // cores físicos escolhidos (ex.: apenas o core 3 quando num_cores=1).
-        for (auto& s : run.alloc.subtasks)
-            if (s.core >= 0) s.core += PHYS_CORE_BASE;
-
-        std::cout << "Running " << run.name
-                  << " (cores fisicos " << PHYS_CORE_BASE
-                  << ".." << (PHYS_CORE_BASE + num_cores - 1) << ")...\n";
+        std::cout << "Running " << run.name << "...\n";
         results.push_back(run_eval(run.name, run.alloc, conns, num_cores));
     }
 

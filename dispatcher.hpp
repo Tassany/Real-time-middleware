@@ -254,8 +254,8 @@ private:
             std::cerr << "[Dispatcher core=" << core_
                       << "] warning: RT priority not applied (run with sudo)\n";
 
-        std::cerr << "[Dispatcher] core=" << core_
-                  << " priority=" << priority_ << " started\n";
+        // std::cerr << "[Dispatcher] core=" << core_
+        //           << " priority=" << priority_ << " started\n";
 
         struct epoll_event events[1];
 
@@ -287,7 +287,7 @@ private:
             }
         }
 
-        std::cerr << "[Dispatcher] core=" << core_ << " stopped\n";
+        // std::cerr << "[Dispatcher] core=" << core_ << " stopped\n";
     }
 
     // Idle thread: lowest real-time priority — only runs when core is idle.
