@@ -196,7 +196,7 @@ static EvalResult run_eval(const std::string& heuristic_name,
     // Métricas por subtask
     struct Metrics {
         uint64_t period_ns = 0;
-        int      core      = 3; // placeholder, heurística vai atribuir
+        int      core      = 0;
         int      priority  = 0;
         std::vector<int64_t> latency_ns;
         int64_t min_lat = std::numeric_limits<int64_t>::max();
@@ -464,6 +464,23 @@ int main(int argc, char* argv[]) {
         { "Best Fit",  allocator::best_fit(subtasks,   num_cores) },
         { "Worst Fit", allocator::worst_fit(subtasks,  num_cores) },
     };
+
+    // Task sorting criteria (Lupu et al. 2010, Sec. 3.2), restricted to
+    // period and utilization since every subtask here uses an implicit
+    // deadline (deadline_ns == period_ns) — deadline/density would be
+    // redundant with period/utilization respectively.
+    struct SortVariant { std::string suffix; allocator::SortCriterion crit; };
+    static const std::vector<SortVariant> sort_variants = {
+        { "PerAsc",   allocator::SortCriterion::PeriodAsc },
+        { "PerDesc",  allocator::SortCriterion::PeriodDesc },
+        { "UtilAsc",  allocator::SortCriterion::UtilizationAsc },
+        { "UtilDesc", allocator::SortCriterion::UtilizationDesc },
+    };
+    for (const auto& sv : sort_variants) {
+        runs.push_back({ "FF+" + sv.suffix, allocator::first_fit(subtasks, num_cores, 1.0, sv.crit) });
+        runs.push_back({ "BF+" + sv.suffix, allocator::best_fit(subtasks,  num_cores, 1.0, sv.crit) });
+        runs.push_back({ "WF+" + sv.suffix, allocator::worst_fit(subtasks, num_cores, 1.0, sv.crit) });
+    }
 
     bool any_infeasible = false;
     for (auto& run : runs) {
