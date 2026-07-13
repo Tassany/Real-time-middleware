@@ -114,10 +114,21 @@ def main():
                 print(stderr.strip()[-500:], file=sys.stderr)
             continue
 
+        if len(parsed) < len(HEURISTICS):
+            failures += 1
+            missing = [n for n in HEURISTICS if n not in parsed]
+            print(f"[run {run_id}] tabela incompleta (rc={rc}): faltam {missing} "
+                  f"— processo provavelmente morreu no meio da rodada, pulando",
+                  file=sys.stderr)
+            if stderr.strip():
+                print(stderr.strip()[-500:], file=sys.stderr)
+            continue
+
         for name in HEURISTICS:
             metrics = parsed.get(name)
             if metrics is None:
-                rows.append({"run_id": run_id, "heuristic": name, "feasible": name in parsed})
+                # Encontrado no stdout mas marcado INFEASIBLE — sem métricas usáveis.
+                rows.append({"run_id": run_id, "heuristic": name, "feasible": False})
             else:
                 rows.append({"run_id": run_id, "heuristic": name, "feasible": True, **metrics})
 
