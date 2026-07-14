@@ -69,7 +69,7 @@ inline void sort_subtasks(std::vector<SubtaskInfo>& subtasks, SortCriterion crit
 // First Fit: place each subtask on the first core that has room.
 inline AllocationResult first_fit(std::vector<SubtaskInfo> subtasks,
                                   int num_cores,
-                                  double capacity = 1000.0,
+                                  double capacity = 1.0,
                                   SortCriterion sort_by = SortCriterion::None) {
     sort_subtasks(subtasks, sort_by);
     AllocationResult r;
@@ -96,7 +96,7 @@ inline AllocationResult first_fit(std::vector<SubtaskInfo> subtasks,
 // Best Fit: place each subtask on the core with the least remaining room that still fits.
 inline AllocationResult best_fit(std::vector<SubtaskInfo> subtasks,
                                  int num_cores,
-                                 double capacity = 1000.0,
+                                 double capacity = 1.0,
                                  SortCriterion sort_by = SortCriterion::None) {
     sort_subtasks(subtasks, sort_by);
     AllocationResult r;
@@ -125,7 +125,7 @@ inline AllocationResult best_fit(std::vector<SubtaskInfo> subtasks,
 // Worst Fit: place each subtask on the core with the most remaining room.
 inline AllocationResult worst_fit(std::vector<SubtaskInfo> subtasks,
                                   int num_cores,
-                                  double capacity = 1000.0,
+                                  double capacity = 1.0,
                                   SortCriterion sort_by = SortCriterion::None) {
     sort_subtasks(subtasks, sort_by);
     AllocationResult r;

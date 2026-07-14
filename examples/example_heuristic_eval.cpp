@@ -438,8 +438,13 @@ static void print_table(const std::string& title,
 //  main
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
-    int num_groups = (argc > 1) ? std::stoi(argv[1]) : 6;
-    int num_cores  = (argc > 2) ? std::stoi(argv[2]) : 3;
+    int    num_groups = (argc > 1) ? std::stoi(argv[1]) : 6;
+    int    num_cores  = (argc > 2) ? std::stoi(argv[2]) : 3;
+    // Capacidade por core repassada a allocator::first_fit/best_fit/worst_fit.
+    // Fixada aqui (em vez de depender do default de allocator.hpp) para que
+    // todas as 15 combinações da tabela usem exatamente o mesmo teto —
+    // testar saturação é só rodar com um valor > 1.0 (ex.: 5.0).
+    double capacity   = (argc > 3) ? std::stod(argv[3]) : 1.0;
 
     auto subtasks = make_subtasks(num_groups);
     auto conns    = make_connections(num_groups);
@@ -450,19 +455,20 @@ int main(int argc, char* argv[]) {
     std::cout << "=== Bin-Packing Heuristic Evaluation ===\n"
               << "Groups: "      << num_groups
               << " | Subtasks: " << subtasks.size()
-              << " | Cores: "    << num_cores << "\n"
+              << " | Cores: "    << num_cores
+              << " | Capacity/core: " << capacity << "\n"
               << "Task types: " << NUM_TASK_TYPES << " (";
     for (int i = 0; i < NUM_TASK_TYPES; ++i)
         std::cout << TASK_TYPES[i].period_ns / 1'000'000 << "ms" << (i < NUM_TASK_TYPES-1 ? "," : "");
     std::cout << ")\n"
               << std::fixed << std::setprecision(4)
-              << "Total util: " << total_util << " / " << num_cores << ".0000\n";
+              << "Total util: " << total_util << " / " << (num_cores * capacity) << "\n";
 
     struct Run { std::string name; AllocationResult alloc; };
     std::vector<Run> runs = {
-        { "First Fit", allocator::first_fit(subtasks,  num_cores) },
-        { "Best Fit",  allocator::best_fit(subtasks,   num_cores) },
-        { "Worst Fit", allocator::worst_fit(subtasks,  num_cores) },
+        { "First Fit", allocator::first_fit(subtasks,  num_cores, capacity) },
+        { "Best Fit",  allocator::best_fit(subtasks,   num_cores, capacity) },
+        { "Worst Fit", allocator::worst_fit(subtasks,  num_cores, capacity) },
     };
 
     // Task sorting criteria (Lupu et al. 2010, Sec. 3.2), restricted to
@@ -477,9 +483,9 @@ int main(int argc, char* argv[]) {
         { "UtilDesc", allocator::SortCriterion::UtilizationDesc },
     };
     for (const auto& sv : sort_variants) {
-        runs.push_back({ "FF+" + sv.suffix, allocator::first_fit(subtasks, num_cores, 1.0, sv.crit) });
-        runs.push_back({ "BF+" + sv.suffix, allocator::best_fit(subtasks,  num_cores, 1.0, sv.crit) });
-        runs.push_back({ "WF+" + sv.suffix, allocator::worst_fit(subtasks, num_cores, 1.0, sv.crit) });
+        runs.push_back({ "FF+" + sv.suffix, allocator::first_fit(subtasks, num_cores, capacity, sv.crit) });
+        runs.push_back({ "BF+" + sv.suffix, allocator::best_fit(subtasks,  num_cores, capacity, sv.crit) });
+        runs.push_back({ "WF+" + sv.suffix, allocator::worst_fit(subtasks, num_cores, capacity, sv.crit) });
     }
 
     bool any_infeasible = false;
