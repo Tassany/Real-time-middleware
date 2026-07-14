@@ -8,7 +8,7 @@ mais consistência ao longo das rodadas.
 
 Uso:
     python3 scripts/run_heuristic_eval_stats.py [--runs N] [--num-groups G] [--num-cores C]
-                                                 [--binary PATH] [--timeout SEC]
+                                                 [--capacity CAP] [--binary PATH] [--timeout SEC]
                                                  [--raw-out CSV] [--summary-out CSV]
                                                  [--progress-every N] [--sudo]
 
@@ -69,8 +69,8 @@ def parse_table(stdout: str):
     return results
 
 
-def run_once(binary, num_groups, num_cores, timeout, use_sudo):
-    cmd = (["sudo"] if use_sudo else []) + [str(binary), str(num_groups), str(num_cores)]
+def run_once(binary, num_groups, num_cores, capacity, timeout, use_sudo):
+    cmd = (["sudo"] if use_sudo else []) + [str(binary), str(num_groups), str(num_cores), str(capacity)]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return proc.returncode, proc.stdout, proc.stderr
 
@@ -80,6 +80,8 @@ def main():
     ap.add_argument("--runs", "-n", type=int, default=1000, help="Número de rodadas (default: 1000)")
     ap.add_argument("--num-groups", type=int, default=6, help="Argumento num_groups do binário (default: 6)")
     ap.add_argument("--num-cores", type=int, default=3, help="Argumento num_cores do binário (default: 3)")
+    ap.add_argument("--capacity", type=float, default=1.0,
+                     help="Capacidade por core repassada ao binário (default: 1.0; >1.0 para testar saturação)")
     ap.add_argument("--binary", type=Path, default=REPO_ROOT / "example_heuristic_eval",
                      help="Caminho do binário (default: ./example_heuristic_eval)")
     ap.add_argument("--timeout", type=float, default=30.0, help="Timeout por rodada em segundos (default: 30)")
@@ -100,7 +102,8 @@ def main():
 
     for run_id in range(1, args.runs + 1):
         try:
-            rc, stdout, stderr = run_once(args.binary, args.num_groups, args.num_cores, args.timeout, args.sudo)
+            rc, stdout, stderr = run_once(args.binary, args.num_groups, args.num_cores, args.capacity,
+                                           args.timeout, args.sudo)
         except subprocess.TimeoutExpired:
             failures += 1
             print(f"[run {run_id}] TIMEOUT — pulando rodada", file=sys.stderr)
