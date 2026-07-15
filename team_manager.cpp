@@ -36,6 +36,14 @@ void TeamManager::initialize(const std::vector<SubtaskEntry>& entries,
     // queue and eventfd — this is the partitioned fixed-priority model.
     for (int id : topo_order_) {
         const SubtaskInfo* info = info_map.at(id);
+
+        // A negative core would reach CPU_SET() unchecked inside the Dispatcher.
+        // Entries built by hand never went through the allocator, so guard here.
+        if (info->core < 0)
+            throw std::runtime_error(
+                "TeamManager::initialize: subtask " + std::to_string(id) +
+                " has no core assigned");
+
         CorePrio cp{info->core, info->priority};
 
         if (dispatchers_.find(cp) == dispatchers_.end()) {
