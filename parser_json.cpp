@@ -1,4 +1,5 @@
 #include "parser_json.hpp"
+#include "allocator.hpp"
 
 
 using json = nlohmann::json;
@@ -15,6 +16,15 @@ DeploymentPlan JsonParser::parse(const std::string& filename){
     plan.hosts       = parse_hosts(j);
     plan.tasks       = parse_tasks(j);
     plan.connections = parse_connections(j);
+    plan.allocation  = parse_allocation(j);
+
+    bool needs_allocation = false;
+    for (const auto& task : plan.tasks)
+        for (const auto& st : task.subtasks)
+            if (st.core == CORE_UNASSIGNED) needs_allocation = true;
+
+    if (needs_allocation)
+        allocator::apply_auto_allocation(plan);
 
     return plan;
 }
@@ -50,7 +60,7 @@ std::vector<SubtaskInfo> JsonParser::parse_subtasks(const json& j) {
         subtask.id      = s.value("id", 0);
         subtask.component_type = s["component_type"];
         subtask.host      = s.value("host", std::string{""});
-        subtask.core      = s["core"];
+        subtask.core      = s.value("core", CORE_UNASSIGNED);
         subtask.priority  = s["priority"];
         subtask.period_ns   = s.value("period_ns", uint64_t(0));
         subtask.deadline_ns = s.value("deadline_ns", uint64_t(0));
@@ -59,6 +69,19 @@ std::vector<SubtaskInfo> JsonParser::parse_subtasks(const json& j) {
         subtasks.push_back(subtask);
     }
     return subtasks;
+}
+
+AllocationConfig JsonParser::parse_allocation(const json& j) {
+    AllocationConfig cfg;  // defaults live in deployment_plan.hpp
+    if (!j.contains("allocation")) return cfg;
+
+    const auto& a = j["allocation"];
+    cfg.strategy  = a.value("strategy",  cfg.strategy);
+    cfg.sort_by   = a.value("sort_by",   cfg.sort_by);
+    cfg.weight    = a.value("weight",    cfg.weight);
+    cfg.num_cores = a.value("num_cores", cfg.num_cores);
+    cfg.capacity  = a.value("capacity",  cfg.capacity);
+    return cfg;
 }
 
 std::vector<ConnectionInfo> JsonParser::parse_connections(const json& j) {

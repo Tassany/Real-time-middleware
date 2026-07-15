@@ -19,6 +19,7 @@ private:
     std::vector<TaskInfo>       parse_tasks(const nlohmann::json& j);
     std::vector<SubtaskInfo>    parse_subtasks(const nlohmann::json& j);
     std::vector<ConnectionInfo> parse_connections(const nlohmann::json& j);
+    AllocationConfig            parse_allocation(const nlohmann::json& j);
 };
 
 #endif // JSON_PARSER_HPP
