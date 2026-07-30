@@ -52,7 +52,19 @@ BENCH_FLAGS=()
 
 cd "$(dirname "$0")"
 
-BENCHES=(insertsort edn fft1 adpcm expint cnt matmult fir bs)
+BENCHES=(insertsort insertsort1024 edn fft1 adpcm expint cnt matmult fir bs)
+
+# vcgencmd lives outside the default PATH on some images and is absent on
+# non-Pi hosts; every call is guarded.
+vcg() {
+	if command -v vcgencmd >/dev/null 2>&1; then
+		vcgencmd "$@" 2>/dev/null || echo "unavailable"
+	elif [ -x /usr/bin/vcgencmd ]; then
+		/usr/bin/vcgencmd "$@" 2>/dev/null || echo "unavailable"
+	else
+		echo "unavailable"
+	fi
+}
 
 # ---------------------------------------------------------------- privileges
 # Everything below is best-effort. Without root the measurement still runs; it
@@ -112,6 +124,12 @@ if [ "$PRIV" -eq 0 ]; then
 fi
 
 # --------------------------------------------------------------- environment
+# The Pi 5 throttles under sustained load, and a battery that throttled midway
+# is silently invalid: the clock drops but nothing in the timing path notices.
+# Sample the throttle word before and after so the run can be judged afterwards.
+THROTTLE_BEFORE=$(vcg get_throttled)
+TEMP_BEFORE=$(vcg measure_temp)
+
 {
 	echo "# Observed-WCET measurement environment"
 	echo "date              : $(date -Is)"
@@ -131,10 +149,19 @@ fi
 		"$(cat /sys/devices/system/cpu/cpu${CORE}/cpufreq/cpuinfo_min_freq 2>/dev/null || echo ?)/" \
 		"$(cat /sys/devices/system/cpu/cpu${CORE}/cpufreq/cpuinfo_max_freq 2>/dev/null || echo ?)"
 	echo "isolcpus/nohz     : $(cat /proc/cmdline 2>/dev/null || echo unknown)"
+	echo "throttled (pre)   : $THROTTLE_BEFORE"
+	echo "soc temp (pre)    : $TEMP_BEFORE"
+	# Explains after the fact why the pmu_* columns came back empty: at
+	# perf_event_paranoid >= 3 an unprivileged process cannot open the counter
+	# at all. Root bypasses it via CAP_PERFMON, which is why sudo matters here
+	# beyond just SCHED_FIFO.
+	echo "perf_event_paranoid: $(cat /proc/sys/kernel/perf_event_paranoid 2>/dev/null || echo unknown)"
 	echo
 	echo "Timing source: CNTVCT_EL0 (ARMv8-A generic timer), read before and"
-	echo "after each execution, per Li et al. 2024 Sec. 5. Cycle columns are"
-	echo "derived as ticks * f_cpu / CNTFRQ_EL0, not measured directly."
+	echo "after each execution, per Li et al. 2024 Sec. 5. The cycle columns are"
+	echo "derived as ticks * f_cpu / CNTFRQ_EL0. The pmu_* columns are real"
+	echo "cycles counted with perf_event_open(PERF_COUNT_HW_CPU_CYCLES) and are"
+	echo "the ones to trust when the two disagree."
 	if [ "$COLD" -eq 1 ]; then
 		echo
 		echo "Cold mode: before each measured run the harness streams an 8 MiB"
@@ -159,8 +186,35 @@ for b in "${BENCHES[@]}"; do
 	"${RUNNER[@]}" "./bin/$b" -n "$N" -w "$WARMUPS" -r "$OUT" ${BENCH_FLAGS[@]+"${BENCH_FLAGS[@]}"} >> "$CSV"
 done
 
+THROTTLE_AFTER=$(vcg get_throttled)
+TEMP_AFTER=$(vcg measure_temp)
+{
+	echo "throttled (post)  : $THROTTLE_AFTER"
+	echo "soc temp (post)   : $TEMP_AFTER"
+} >> "$OUT/env.txt"
+
 if [ "$PRIV" -eq 1 ] && [ -n "$SUDO" ]; then
 	$SUDO chown -R "$(id -u):$(id -g)" "$OUT" 2>/dev/null || true
+fi
+
+# throttled=0x0 is the clean case. Any other value means the firmware capped
+# the clock or the voltage at some point; bits 0-3 are live conditions, bits
+# 16-19 latch that it happened since boot. Either way the numbers above were
+# taken on a machine that was not running flat out.
+if [ "$THROTTLE_AFTER" != "unavailable" ] && [ "$THROTTLE_AFTER" != "throttled=0x0" ]; then
+	echo >&2
+	echo "############################################################" >&2
+	echo "## WARNING: the SoC reports throttling." >&2
+	echo "##   before: $THROTTLE_BEFORE  ($TEMP_BEFORE)" >&2
+	echo "##   after : $THROTTLE_AFTER  ($TEMP_AFTER)" >&2
+	echo "## The core clock was capped at some point, so these timings" >&2
+	echo "## understate the machine and the cycle conversion is off." >&2
+	echo "## Let the board cool, add a fan or a heatsink, and re-run." >&2
+	echo "############################################################" >&2
+elif [ "$THROTTLE_BEFORE" != "$THROTTLE_AFTER" ]; then
+	echo >&2
+	echo "## WARNING: throttle state changed during the run" >&2
+	echo "##   $THROTTLE_BEFORE -> $THROTTLE_AFTER" >&2
 fi
 
 # ------------------------------------------------------------------- report
@@ -179,3 +233,24 @@ runs). MAX is the largest execution actually seen and is the more honest
 worst-case proxy -- neither is a sound upper bound, since measurement can only
 ever report paths that happened to execute.
 EOF
+
+# ------------------------------------------------- comparison against Fig. 10
+# The deliverable. Written to the results directory as well as the terminal so
+# it travels with the CSVs it was generated from.
+if command -v python3 >/dev/null 2>&1; then
+	COLD_DIR=results-cold
+	WARM_DIR=results
+	[ "$COLD" -eq 1 ] && COLD_DIR="$OUT" || WARM_DIR="$OUT"
+	echo >&2
+	if ./compare.py -c "$COLD_DIR" -w "$WARM_DIR" > "$OUT/comparison.md" 2>/dev/null; then
+		cat "$OUT/comparison.md" >&2
+		echo >&2
+		echo "==> $OUT/comparison.md" >&2
+	else
+		rm -f "$OUT/comparison.md"
+		echo "==> compare.py found no results to join; run it by hand later" >&2
+	fi
+else
+	echo "==> python3 not installed; skipping the comparison table." >&2
+	echo "    Install it and run ./compare.py to produce comparison.md." >&2
+fi

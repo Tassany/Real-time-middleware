@@ -17,7 +17,10 @@
  *     (54 MHz on the Pi, ~18.52 ns per tick) regardless of the core's clock.
  *     Cycles are therefore a derived quantity, ticks * f_cpu / f_timer, and we
  *     report ticks, microseconds and converted cycles in separate columns so
- *     the conversion stays auditable.
+ *     the conversion stays auditable.  Since the paper's figures are plotted in
+ *     processor cycles, we additionally count real cycles with the PMU via
+ *     perf_event_open, so the cycle comparison rests on a measurement rather
+ *     than on the assumption that the clock never moved.
  *
  *   - Averaging runs estimates the AVERAGE case, not the worst case.  We report
  *     the mean to match the paper, and the max alongside it as the honest
@@ -36,6 +39,9 @@
 #include <unistd.h>
 #include <sched.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
+#include <linux/perf_event.h>
 
 #if !defined(__aarch64__)
 #error "This harness reads CNTVCT_EL0/CNTFRQ_EL0 and only builds for AArch64. \
@@ -85,6 +91,79 @@ static inline uint64_t rd_cntfrq(void)
 	uint64_t v;
 	__asm__ __volatile__("mrs %0, cntfrq_el0" : "=r"(v));
 	return v;
+}
+
+/* -------------------------------------------------------------------- PMU */
+/*
+ * Real cycle counting, alongside the generic timer.
+ *
+ * The paper plots processor cycles, but its stated instrument -- the generic
+ * timer -- cannot produce them: CNTVCT_EL0 runs at a fixed 54 MHz on the Pi and
+ * knows nothing about the core clock.  Converting ticks to cycles therefore
+ * assumes a clock that held steady for the whole batch.  PERF_COUNT_HW_CPU_CYCLES
+ * counts the real thing, so the two columns can be checked against each other
+ * instead of one being taken on faith.
+ *
+ * exclude_kernel means the PMU stops counting inside interrupt handlers while
+ * the generic timer keeps running through them.  A sample where derived and
+ * measured cycles diverge sharply is thus a sample the OS interrupted -- the
+ * disagreement is a jitter detector, not a defect.
+ *
+ * Entirely optional.  If the event cannot be opened (perf_event_paranoid, no
+ * PMU access under a hypervisor, an old kernel) we say so once and fall back to
+ * exactly the behaviour that existed before: generic timer, derived cycles.
+ */
+struct pmu_read {
+	uint64_t value;
+	uint64_t time_enabled;
+	uint64_t time_running;
+};
+
+static int pmu_fd = -1;
+
+static int pmu_open(void)
+{
+	struct perf_event_attr attr;
+	long fd;
+
+	memset(&attr, 0, sizeof(attr));
+	attr.type           = PERF_TYPE_HARDWARE;
+	attr.size           = sizeof(attr);
+	attr.config         = PERF_COUNT_HW_CPU_CYCLES;
+	attr.disabled       = 1;
+	/* pinned: keep the counter on hardware for the whole batch rather than
+	 * letting it be multiplexed, which would scale the counts. */
+	attr.pinned         = 1;
+	attr.exclude_kernel = 1;
+	attr.exclude_hv     = 1;
+	attr.read_format    = PERF_FORMAT_TOTAL_TIME_ENABLED |
+			      PERF_FORMAT_TOTAL_TIME_RUNNING;
+
+	/* pid 0, cpu -1: this thread, wherever it is scheduled.  The thread is
+	 * already pinned by taskset, so the counter follows the measured core. */
+	fd = syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0UL);
+	if (fd < 0)
+		return -1;
+	pmu_fd = (int)fd;
+
+	if (ioctl(pmu_fd, PERF_EVENT_IOC_RESET, 0) != 0 ||
+	    ioctl(pmu_fd, PERF_EVENT_IOC_ENABLE, 0) != 0) {
+		close(pmu_fd);
+		pmu_fd = -1;
+		return -1;
+	}
+	return 0;
+}
+
+/* Read the free-running counter.  Called outside the CNTVCT window -- see the
+ * measurement loop for why. */
+static inline int pmu_sample(struct pmu_read *r)
+{
+	if (pmu_fd < 0)
+		return -1;
+	if (read(pmu_fd, r, sizeof(*r)) != (ssize_t)sizeof(*r))
+		return -1;
+	return 0;
 }
 
 /* -------------------------------------------------------- cache eviction */
@@ -250,7 +329,10 @@ static const char *CSV_HEADER =
 	"min_ticks,mean_ticks,median_ticks,max_ticks,"
 	"min_us,mean_us,median_us,max_us,"
 	"min_cycles,mean_cycles,median_cycles,max_cycles,"
-	"cpu_freq_hz,timer_freq_hz";
+	"cpu_freq_hz,timer_freq_hz,"
+	/* Appended, never inserted: existing column positions stay put so the
+	 * awk report in run_all.sh and any older analysis keep working. */
+	"min_pmucyc,mean_pmucyc,median_pmucyc,max_pmucyc,pmu_ok";
 
 static void usage(const char *argv0)
 {
@@ -274,10 +356,12 @@ int main(int argc, char **argv)
 {
 	int n = DEFAULT_RUNS, warmups = DEFAULT_WARMUPS, cold = 0;
 	const char *rawdir = NULL;
-	uint64_t *ticks;
+	uint64_t *ticks, *pmucyc = NULL;
 	uint64_t f_timer, f_cpu_before, f_cpu_after, f_cpu;
-	uint64_t overhead = UINT64_MAX;
-	struct stats st;
+	uint64_t overhead = UINT64_MAX, pmu_overhead = UINT64_MAX;
+	struct pmu_read pmu_first, pmu_last;
+	int pmu_ok = 0;
+	struct stats st, pst;
 	double us_per_tick, cyc_per_tick;
 	volatile int sink = 0;
 	int cpu, i;
@@ -330,6 +414,15 @@ int main(int argc, char **argv)
 				"/proc/self/maps; evicting data only, I-cache stays warm\n",
 			BENCH_NAME);
 
+	if (pmu_open() != 0)
+		fprintf(stderr,
+			"[%s] warning: perf_event_open(CPU_CYCLES) failed (%s); cycle "
+			"columns will be derived from the generic timer only. Check "
+			"/proc/sys/kernel/perf_event_paranoid or run as root.\n",
+			BENCH_NAME, strerror(errno));
+	else
+		pmu_ok = 1;
+
 	/* Cost of the instrumentation itself, so it can be judged against the
 	 * shorter benchmarks rather than assumed negligible. */
 	for (i = 0; i < 1000; i++) {
@@ -339,32 +432,98 @@ int main(int argc, char **argv)
 		if (b - a < overhead)
 			overhead = b - a;
 	}
+	/* The same empty window as the measurement loop below, so this is exactly
+	 * the amount by which the cycle window exceeds the tick window. */
+	if (pmu_ok) {
+		for (i = 0; i < 1000; i++) {
+			struct pmu_read a, b;
+
+			if (pmu_sample(&a) != 0)
+				break;
+			(void)rd_cntvct();
+			(void)rd_cntvct();
+			if (pmu_sample(&b) != 0)
+				break;
+			if (b.value - a.value < pmu_overhead)
+				pmu_overhead = b.value - a.value;
+		}
+	}
 
 	ticks = malloc((size_t)n * sizeof(*ticks));
 	if (!ticks) {
 		fprintf(stderr, "harness: out of memory\n");
 		return 1;
 	}
+	if (pmu_ok) {
+		pmucyc = malloc((size_t)n * sizeof(*pmucyc));
+		if (!pmucyc) {
+			fprintf(stderr, "harness: out of memory\n");
+			return 1;
+		}
+	}
 
 	for (i = 0; i < warmups; i++)
 		sink = bench_entry();
 
+	memset(&pmu_first, 0, sizeof(pmu_first));
+	memset(&pmu_last, 0, sizeof(pmu_last));
+
 	for (i = 0; i < n; i++) {
 		uint64_t t0, t1;
+		struct pmu_read c0, c1;
 
 		if (cold)
 			cache_flush();
+
+		/* read() is a syscall and must not land inside the tick window, so
+		 * the cycle window is nested outside it. The consequence is that
+		 * cycle counts include the two rd_cntvct() reads while tick counts
+		 * are untouched by the PMU reads; pmu_overhead above quantifies the
+		 * difference. Sampling the counter after the flush keeps eviction
+		 * cycles out of the measurement. */
+		if (pmu_ok && pmu_sample(&c0) != 0) {
+			fprintf(stderr, "[%s] warning: PMU read failed mid-batch (%s); "
+					"dropping measured-cycle columns\n",
+				BENCH_NAME, strerror(errno));
+			pmu_ok = 0;
+		}
 		t0 = rd_cntvct();
 		sink = bench_entry();
 		t1 = rd_cntvct();
+		if (pmu_ok && pmu_sample(&c1) != 0) {
+			fprintf(stderr, "[%s] warning: PMU read failed mid-batch (%s); "
+					"dropping measured-cycle columns\n",
+				BENCH_NAME, strerror(errno));
+			pmu_ok = 0;
+		}
+
 		ticks[i] = t1 - t0;
+		if (pmu_ok) {
+			pmucyc[i] = c1.value - c0.value;
+			if (i == 0)
+				pmu_first = c0;
+			pmu_last = c1;
+		}
 	}
 	(void)sink;
+
+	/* pinned=1 should prevent multiplexing outright, but if the counter was
+	 * ever descheduled the raw values are an undercount rather than something
+	 * to silently scale. Say so and let the run be judged. */
+	if (pmu_ok && pmu_last.time_enabled != pmu_last.time_running)
+		fprintf(stderr,
+			"[%s] warning: PMU event was multiplexed (enabled %llu ns vs "
+			"running %llu ns); measured cycles undercount\n",
+			BENCH_NAME,
+			(unsigned long long)(pmu_last.time_enabled - pmu_first.time_enabled),
+			(unsigned long long)(pmu_last.time_running - pmu_first.time_running));
 
 	f_cpu_after = cpu_freq_hz(cpu);
 	f_cpu = f_cpu_before ? f_cpu_before : f_cpu_after;
 
 	compute_stats(ticks, n, &st);
+	if (pmu_ok)
+		compute_stats(pmucyc, n, &pst);
 
 	us_per_tick  = 1e6 / (double)f_timer;
 	cyc_per_tick = f_cpu ? (double)f_cpu / (double)f_timer : 0.0;
@@ -374,7 +533,7 @@ int main(int argc, char **argv)
 	       "%llu,%.2f,%.2f,%llu,"
 	       "%.4f,%.4f,%.4f,%.4f,"
 	       "%.1f,%.1f,%.1f,%.1f,"
-	       "%llu,%llu\n",
+	       "%llu,%llu",
 	       BENCH_NAME, n,
 	       (unsigned long long)st.min, st.mean, st.median, (unsigned long long)st.max,
 	       st.min * us_per_tick, st.mean * us_per_tick,
@@ -382,6 +541,12 @@ int main(int argc, char **argv)
 	       st.min * cyc_per_tick, st.mean * cyc_per_tick,
 	       st.median * cyc_per_tick, st.max * cyc_per_tick,
 	       (unsigned long long)f_cpu, (unsigned long long)f_timer);
+	if (pmu_ok)
+		printf(",%llu,%.1f,%.1f,%llu,1\n",
+		       (unsigned long long)pst.min, pst.mean, pst.median,
+		       (unsigned long long)pst.max);
+	else
+		printf(",,,,,0\n");   /* empty, not zero: absent is not "took 0 cycles" */
 	fflush(stdout);
 
 	/* ---- human-readable report (stderr) ---- */
@@ -398,6 +563,32 @@ int main(int argc, char **argv)
 		st.min * us_per_tick, st.mean * us_per_tick,
 		st.median * us_per_tick, st.max * us_per_tick,
 		st.mean > 0.0 ? st.max / st.mean : 0.0);
+	if (pmu_ok) {
+		fprintf(stderr,
+			"[%s]   PMU cycles: min %10llu | mean %12.1f | median %12.1f | "
+			"MAX %10llu   (window overhead %llu cyc)\n",
+			BENCH_NAME, (unsigned long long)pst.min, pst.mean, pst.median,
+			(unsigned long long)pst.max,
+			pmu_overhead == UINT64_MAX ? 0ULL
+						   : (unsigned long long)pmu_overhead);
+		/* Derived and measured cycles should agree to a few percent on a
+		 * quiet, clock-locked core. They will not if the clock moved or an
+		 * interrupt landed inside the window, which is the point of showing
+		 * both rather than picking one. */
+		if (cyc_per_tick > 0.0 && pst.mean > 0.0) {
+			double derived = st.mean * cyc_per_tick;
+			double skew = derived / pst.mean;
+
+			if (skew < 0.9 || skew > 1.1)
+				fprintf(stderr,
+					"[%s] warning: derived cycles (%.0f) and measured "
+					"cycles (%.0f) disagree by %.1f%%. The core clock "
+					"likely moved, or the OS interrupted the timed "
+					"window -- prefer the measured column.\n",
+					BENCH_NAME, derived, pst.mean,
+					(skew - 1.0) * 100.0);
+		}
+	}
 
 	if (f_cpu_before && f_cpu_after && f_cpu_before != f_cpu_after)
 		fprintf(stderr,
@@ -440,17 +631,25 @@ int main(int argc, char **argv)
 			fprintf(stderr, "[%s] warning: cannot write %s (%s)\n",
 				BENCH_NAME, path, strerror(errno));
 		} else {
-			fprintf(f, "benchmark,run,ticks,us,cycles\n");
-			for (i = 0; i < n; i++)
-				fprintf(f, "%s,%d,%llu,%.4f,%.1f\n",
+			fprintf(f, "benchmark,run,ticks,us,cycles,pmu_cycles\n");
+			for (i = 0; i < n; i++) {
+				fprintf(f, "%s,%d,%llu,%.4f,%.1f,",
 					BENCH_NAME, i + 1,
 					(unsigned long long)ticks[i],
 					ticks[i] * us_per_tick,
 					ticks[i] * cyc_per_tick);
+				if (pmu_ok)
+					fprintf(f, "%llu\n", (unsigned long long)pmucyc[i]);
+				else
+					fprintf(f, "\n");
+			}
 			fclose(f);
 		}
 	}
 
+	if (pmu_fd >= 0)
+		close(pmu_fd);
+	free(pmucyc);
 	free(ticks);
 	return 0;
 }

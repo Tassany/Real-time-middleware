@@ -1,0 +1,40 @@
+# Reference values from Li et al., "WCET Analysis Based on Micro-Architecture
+# Modeling for Embedded System Security", Appl. Sci. 14 (2024) 7277.
+#
+# Figure 10, p. 15: "WCET experimental data from the Raspberry Pi 4 Model B with
+# Crotex-A75 processor." Units are processor cycles (the figure's left y-axis).
+#
+# These are transcribed from the data labels printed on the bars, not estimated
+# from bar heights. Every pair was cross-checked against the ratio line plotted
+# on the figure's secondary axis: estimated/observed reproduces the printed
+# ratio to two decimals for all nine benchmarks, which is what makes the
+# transcription verifiable rather than a reading off a chart.
+#
+# "estimated" is their static analysis tool's bound (the figure calls it
+# "Measured WCET", which is a mislabel -- the text consistently calls the
+# tool's output the estimated WCET and the board measurement the observed one).
+# "observed" is the empirical value we are reproducing: the mean of five
+# executions timed with the ARMv8-A generic timer.
+#
+# Figure 11 gives the same benchmarks on a Firefly ROC-RK3568-PC-SE (Cortex-A55)
+# and is included for context; it is not the board we are comparing against.
+#
+benchmark,estimated_cycles,observed_cycles,ratio,board
+insertsort,1983695,1568494,1.26,rpi4b-cortex-a75
+edn,468729,125861,3.72,rpi4b-cortex-a75
+fft,181048,120065,1.51,rpi4b-cortex-a75
+adpcm,76156,46349,1.64,rpi4b-cortex-a75
+expint,59958,42831,1.40,rpi4b-cortex-a75
+cnt,48748,35617,1.37,rpi4b-cortex-a75
+matmult,19831,16816,1.18,rpi4b-cortex-a75
+fir,14059,9557,1.47,rpi4b-cortex-a75
+bs,9706,8102,1.20,rpi4b-cortex-a75
+insertsort,2254199,1718379,1.31,firefly-cortex-a55
+edn,532647,145270,3.67,firefly-cortex-a55
+fft,205736,160745,1.28,firefly-cortex-a55
+adpcm,86541,53603,1.61,firefly-cortex-a55
+expint,68134,53441,1.27,firefly-cortex-a55
+cnt,55396,19876,2.79,firefly-cortex-a55
+matmult,22535,20171,1.12,firefly-cortex-a55
+fir,15976,11338,1.41,firefly-cortex-a55
+bs,11030,6185,1.78,firefly-cortex-a55

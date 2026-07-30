@@ -4,7 +4,11 @@
 # The Malardalen sources in the parent directory are never modified -- the
 # benchmark's main() is renamed at compile time with -Dmain=bench_entry.
 
-BENCHES := insertsort edn fft1 adpcm expint cnt matmult fir bs
+# insertsort1024 is the tenth entry and is not a Malardalen file: Li et al. say
+# they "changed the length of the target reversed array in insertsort to 1024",
+# so a row measuring the same work they measured needs that variant. It lives
+# here rather than in ../ to keep the Malardalen drop byte-for-byte upstream.
+BENCHES := insertsort insertsort1024 edn fft1 adpcm expint cnt matmult fir bs
 
 SRCDIR  := ..
 CC      ?= gcc
@@ -56,6 +60,11 @@ obj/.flags: force | obj
 obj/adpcm.bench.o: BENCH_CFLAGS += -finput-charset=ISO-8859-1
 
 obj/%.bench.o: $(SRCDIR)/%.c bench_shim.h obj/.flags | obj
+	$(CC) $(BENCH_CFLAGS) -c $< -o $@
+
+# insertsort1024.c is in this directory, not $(SRCDIR). An explicit rule beats
+# the pattern rule above, so no vpath games are needed; the flags are identical.
+obj/insertsort1024.bench.o: insertsort1024.c bench_shim.h obj/.flags | obj
 	$(CC) $(BENCH_CFLAGS) -c $< -o $@
 
 obj/%.harness.o: harness.c obj/.flags | obj
