@@ -27,7 +27,15 @@ COMMON := -std=gnu17 $(OPT) -fno-builtin -g
 
 # -w on the benchmark side only: these are 2000-2005 sources and the warning
 # noise would bury anything real coming out of harness.c.
+#
+# -fno-stack-protector: Debian and Ubuntu build GCC with -fstack-protector-strong
+# on by default, which injects a canary load and compare into every function with
+# a local array -- edn and fir both pick up a reference to __stack_chk_fail. That
+# is compiler-injected code sitting inside the timed region and absent from the
+# CFG a static analyser sees, so it is turned off to keep the measured program
+# faithful to the source, per the Malardalen/Chronos convention.
 BENCH_CFLAGS := $(COMMON) $(PERMISSIVE) -w \
+	-fno-stack-protector \
 	-DUPPSALAWCET \
 	-include bench_shim.h \
 	-Dmain=bench_entry
