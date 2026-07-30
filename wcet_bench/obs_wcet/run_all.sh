@@ -3,39 +3,52 @@
 # run_all.sh — measure the observed WCET of the Malardalen subset used in
 # Figure 10 of Li et al. (2024), on a Raspberry Pi 5.
 #
-# Produces:
-#   results/observed_wcet.csv   one summary row per benchmark
-#   results/raw_<bench>.csv     every individual run
-#   results/env.txt             the machine state the numbers were taken under
+# Produces (in results/, or results-cold/ with -f):
+#   observed_wcet.csv   one summary row per benchmark
+#   raw_<bench>.csv     every individual run
+#   env.txt             the machine state the numbers were taken under
 #
 set -euo pipefail
 
 N=20
 WARMUPS=1
 CORE=3
-OUT=results
+COLD=0
+OUT=""
 
 usage() {
 	cat <<EOF
-usage: $0 [-n RUNS] [-w WARMUPS] [-c CORE] [-o OUTDIR]
+usage: $0 [-n RUNS] [-w WARMUPS] [-c CORE] [-f] [-o OUTDIR]
 
   -n RUNS     measured executions per benchmark (default $N; use 5 to match the paper)
   -w WARMUPS  discarded executions before measuring (default $WARMUPS)
   -c CORE     core to pin to (default $CORE, the last of the Pi 5's four)
-  -o OUTDIR   output directory (default $OUT)
+  -f          cold cache: evict L1/L2/L3 and invalidate the I-cache before each
+              measured run. This is the regime static WCET analysis assumes;
+              without it the numbers are steady-state throughput.
+  -o OUTDIR   output directory (default results, or results-cold with -f)
 EOF
 }
 
-while getopts "n:w:c:o:h" opt; do
+while getopts "n:w:c:o:fh" opt; do
 	case "$opt" in
 		n) N=$OPTARG ;;
 		w) WARMUPS=$OPTARG ;;
 		c) CORE=$OPTARG ;;
 		o) OUT=$OPTARG ;;
+		f) COLD=1 ;;
 		h) usage; exit 0 ;;
 		*) usage; exit 2 ;;
 	esac
 done
+
+# Separate directories by default so a cold run never overwrites a warm one.
+if [ -z "$OUT" ]; then
+	[ "$COLD" -eq 1 ] && OUT=results-cold || OUT=results
+fi
+
+BENCH_FLAGS=()
+[ "$COLD" -eq 1 ] && BENCH_FLAGS+=(-f)
 
 cd "$(dirname "$0")"
 
@@ -109,6 +122,7 @@ fi
 	echo "opt level         : ${OPT:--O0}"
 	echo "runs (N)          : $N"
 	echo "warmups           : $WARMUPS"
+	echo "cache state       : $([ "$COLD" -eq 1 ] && echo 'COLD (evicted before every measured run)' || echo 'warm (steady state)')"
 	echo "pinned core       : $CORE"
 	echo "SCHED_FIFO(80)    : $([ "$FIFO_OK" -eq 1 ] && echo yes || echo 'no (unprivileged)')"
 	echo "governor forced   : $([ "$GOV_OK" -eq 1 ] && echo 'performance' || echo "no (left at $(cat "$GOV_PATH" 2>/dev/null || echo unknown))")"
@@ -121,6 +135,13 @@ fi
 	echo "Timing source: CNTVCT_EL0 (ARMv8-A generic timer), read before and"
 	echo "after each execution, per Li et al. 2024 Sec. 5. Cycle columns are"
 	echo "derived as ticks * f_cpu / CNTFRQ_EL0, not measured directly."
+	if [ "$COLD" -eq 1 ]; then
+		echo
+		echo "Cold mode: before each measured run the harness streams an 8 MiB"
+		echo "buffer (past L1D, L2 and L3) and invalidates the I-cache over its"
+		echo "own text segment. The branch predictor cannot be reset from EL0 and"
+		echo "stays warm, so these are a lower bound on a true cold start."
+	fi
 } > "$OUT/env.txt"
 
 cat "$OUT/env.txt" >&2
@@ -135,7 +156,7 @@ for b in "${BENCHES[@]}"; do
 		echo "==> skipping $b: binary missing" >&2
 		continue
 	fi
-	"${RUNNER[@]}" "./bin/$b" -n "$N" -w "$WARMUPS" -r "$OUT" >> "$CSV"
+	"${RUNNER[@]}" "./bin/$b" -n "$N" -w "$WARMUPS" -r "$OUT" ${BENCH_FLAGS[@]+"${BENCH_FLAGS[@]}"} >> "$CSV"
 done
 
 if [ "$PRIV" -eq 1 ] && [ -n "$SUDO" ]; then
