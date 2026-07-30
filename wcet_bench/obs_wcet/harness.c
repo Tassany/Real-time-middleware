@@ -59,6 +59,9 @@ extern int bench_entry();
 /* Below this many ticks the measurement is within a couple of timer periods
  * and the trailing digits are quantisation noise rather than signal. */
 #define LOW_RES_TICKS     50
+/* At or below this the sample is indistinguishable from an empty timed region,
+ * which on an optimised build means the benchmark was optimised away. */
+#define DCE_SUSPECT_TICKS  3
 /* Cache-eviction working set for cold mode. The Pi 5 (Cortex-A76) carries
  * 64 KiB L1D and 512 KiB L2 per core plus 2 MiB of shared L3; 8 MiB streams
  * past all three. */
@@ -406,7 +409,21 @@ int main(int argc, char **argv)
 		fprintf(stderr,
 			"[%s] warning: could not read the core clock from sysfs; "
 			"cycle columns are 0\n", BENCH_NAME);
-	if (st.median < LOW_RES_TICKS)
+	/* A couple of ticks is roughly the cost of the two counter reads alone.
+	 * Optimised builds reach this when the compiler deletes the benchmark: the
+	 * Malardalen sources discard their results, so at -O1 and above GCC can
+	 * prove the work unobservable and drop it (fir writes only to a dead local;
+	 * expint's return value is thrown away). That is a silent invalid
+	 * measurement, not a fast one, so say so rather than just flagging it as
+	 * short. */
+	if (st.median <= DCE_SUSPECT_TICKS)
+		fprintf(stderr,
+			"[%s] WARNING: median is %.1f ticks, barely above the %llu-tick "
+			"cost of reading the timer. If this was built with -O1 or higher, "
+			"the compiler most likely eliminated the benchmark as dead code -- "
+			"treat this row as invalid and rebuild with OPT=-O0.\n",
+			BENCH_NAME, st.median, (unsigned long long)overhead);
+	else if (st.median < LOW_RES_TICKS)
 		fprintf(stderr,
 			"[%s] warning: median is %.1f ticks, near the %.3f ns timer "
 			"period -- this benchmark is too short to resolve reliably\n",

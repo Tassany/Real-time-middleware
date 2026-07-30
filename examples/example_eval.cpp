@@ -36,6 +36,7 @@
 #include <memory>
 #include <fstream>
 #include <vector>
+#include <cstdlib>
 #include "team_manager.hpp"
 #include "parser_json.hpp"
 
@@ -87,10 +88,15 @@ static int64_t vmax(const std::vector<int64_t>& v) {
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <deployment_plan.json>\n"
-                  << "       sudo " << argv[0] << " ...  (for SCHED_FIFO)\n";
+        std::cerr << "Usage: " << argv[0] << " <deployment_plan.json> [hyperperiods]\n"
+                  << "       sudo " << argv[0] << " ...  (for SCHED_FIFO)\n"
+                  << "  hyperperiods: number of hyperperiods to simulate (default 4)\n";
         return 1;
     }
+
+    // Number of hyperperiods to simulate; more => more ticks (longer run).
+    uint64_t hyperperiods = (argc > 2) ? std::strtoull(argv[2], nullptr, 10) : 4;
+    if (hyperperiods == 0) hyperperiods = 4;
 
     // -----------------------------------------------------------------------
     //  1. Parse deployment plan
@@ -134,7 +140,7 @@ int main(int argc, char* argv[]) {
     for (std::size_t i = 1; i < sources.size(); ++i)
         lcm_p = std::lcm(lcm_p, sources[i].second);
 
-    int ticks = static_cast<int>(4 * lcm_p / min_p);
+    int ticks = static_cast<int>(hyperperiods * lcm_p / min_p);
 
     // -----------------------------------------------------------------------
     //  5. Phase 1 — allocate Subtask objects and pre-reserve metrics vectors
@@ -155,7 +161,7 @@ int main(int argc, char* argv[]) {
 
             // Max capacity = expected number of jobs for this period
             int cap = (st.period_ns > 0)
-                ? static_cast<int>(4 * lcm_p / st.period_ns) + 4
+                ? static_cast<int>(hyperperiods * lcm_p / st.period_ns) + 4
                 : ticks + 4;
             m.latency_ns.reserve(cap);
         }

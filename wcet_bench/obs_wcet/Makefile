@@ -34,19 +34,31 @@ LDLIBS := -lm
 
 BINS := $(addprefix bin/,$(BENCHES))
 
-.PHONY: all clean
+.PHONY: all clean force
 all: $(BINS)
 
 bin obj:
 	@mkdir -p $@
 
+# Everything depends on this stamp, whose contents are the full compiler command
+# line. Without it, `make OPT=-O2` after a default build reports "nothing to be
+# done" and silently re-measures the -O0 binaries while the run log claims -O2.
+# The recipe rewrites the file only when the flags actually changed, so the
+# timestamp -- and therefore the rebuild -- is triggered by content, not by
+# every invocation.
+FLAG_SIG := $(CC) | $(BENCH_CFLAGS) | $(HARNESS_CFLAGS) | $(LDLIBS)
+
+obj/.flags: force | obj
+	@printf '%s\n' '$(FLAG_SIG)' | cmp -s - $@ || \
+		{ printf '%s\n' '$(FLAG_SIG)' > $@; echo "==> build flags changed, rebuilding"; }
+
 # adpcm.c is ISO-8859-1 with CRLF line endings (accented Swedish comments).
 obj/adpcm.bench.o: BENCH_CFLAGS += -finput-charset=ISO-8859-1
 
-obj/%.bench.o: $(SRCDIR)/%.c bench_shim.h | obj
+obj/%.bench.o: $(SRCDIR)/%.c bench_shim.h obj/.flags | obj
 	$(CC) $(BENCH_CFLAGS) -c $< -o $@
 
-obj/%.harness.o: harness.c | obj
+obj/%.harness.o: harness.c obj/.flags | obj
 	$(CC) $(HARNESS_CFLAGS) -DBENCH_NAME='"$*"' -c harness.c -o $@
 
 .SECONDARY: $(addprefix obj/,$(addsuffix .bench.o,$(BENCHES))) \
