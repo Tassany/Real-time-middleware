@@ -59,6 +59,11 @@ extern int bench_entry();
 /* Below this many ticks the measurement is within a couple of timer periods
  * and the trailing digits are quantisation noise rather than signal. */
 #define LOW_RES_TICKS     50
+/* Cache-eviction working set for cold mode. The Pi 5 (Cortex-A76) carries
+ * 64 KiB L1D and 512 KiB L2 per core plus 2 MiB of shared L3; 8 MiB streams
+ * past all three. */
+#define FLUSH_BYTES  (8u << 20)
+#define CACHE_LINE   64
 
 /* ------------------------------------------------------------------ timer */
 
@@ -77,6 +82,90 @@ static inline uint64_t rd_cntfrq(void)
 	uint64_t v;
 	__asm__ __volatile__("mrs %0, cntfrq_el0" : "=r"(v));
 	return v;
+}
+
+/* -------------------------------------------------------- cache eviction */
+/*
+ * Cold-cache mode (-f).
+ *
+ * Without it the harness measures steady state: N back-to-back executions in
+ * one process leave code, data and page tables resident in L1, which is a
+ * throughput figure rather than a worst case.  Static WCET analysis -- the
+ * Chronos-derived tool this experiment exists to compare against included --
+ * assumes an empty cache at program entry, so warm numbers are not comparable
+ * with an estimated bound at all.
+ *
+ * EL0 cannot issue DC CISW, so we evict by construction instead:
+ *   - data: stream a buffer larger than L1+L2+L3, reading it and then dirtying
+ *     it, which forces write-back of everything the benchmark left behind;
+ *   - instructions: __builtin___clear_cache() over our own text segment, which
+ *     on AArch64 emits DC CVAU + IC IVAU -- both permitted at EL0 because Linux
+ *     sets SCTLR_EL1.UCI.
+ *
+ * Warm-ups still run before the measured batch even in cold mode.  They pre-
+ * fault the benchmark's .bss and grow the stack, so page-fault cost stays out
+ * of the samples: the paper's reference tool models caches, and explicitly does
+ * not model TLBs or demand paging.
+ *
+ * Out of reach from userspace, and therefore still warm: the branch predictor
+ * and the prefetcher history.  Cold-mode numbers are a lower bound on a true
+ * cold start, not an upper one.
+ */
+static unsigned char *flush_buf;
+static volatile unsigned long flush_sink;
+static uintptr_t text_lo, text_hi;
+
+/* Locate our own executable mapping, so the I-cache invalidation covers the
+ * benchmark code and everything it calls rather than a guessed range. */
+static void find_text_range(void)
+{
+	FILE *f = fopen("/proc/self/maps", "r");
+	uintptr_t target = (uintptr_t)(void *)&bench_entry;
+	char line[512];
+
+	if (!f)
+		return;
+	while (fgets(line, sizeof(line), f)) {
+		unsigned long lo, hi;
+		char perms[8];
+
+		if (sscanf(line, "%lx-%lx %7s", &lo, &hi, perms) != 3)
+			continue;
+		if (perms[2] == 'x' && target >= lo && target < hi) {
+			text_lo = lo;
+			text_hi = hi;
+			break;
+		}
+	}
+	fclose(f);
+}
+
+static int flush_init(void)
+{
+	flush_buf = malloc(FLUSH_BYTES);
+	if (!flush_buf)
+		return -1;
+	memset(flush_buf, 1, FLUSH_BYTES);
+	find_text_range();
+	return 0;
+}
+
+static void cache_flush(void)
+{
+	volatile unsigned char *p = flush_buf;
+	unsigned long acc = 0;
+	size_t i;
+
+	/* Read pass evicts; write pass leaves the lines dirty so the next
+	 * eviction cycle cannot be served from a clean copy. */
+	for (i = 0; i < FLUSH_BYTES; i += CACHE_LINE)
+		acc += p[i];
+	for (i = 0; i < FLUSH_BYTES; i += CACHE_LINE)
+		p[i] = (unsigned char)(acc + i);
+	flush_sink = acc;
+
+	if (text_hi > text_lo)
+		__builtin___clear_cache((char *)text_lo, (char *)text_hi);
 }
 
 /* ------------------------------------------------------------------ sysfs */
@@ -163,11 +252,14 @@ static const char *CSV_HEADER =
 static void usage(const char *argv0)
 {
 	fprintf(stderr,
-		"usage: %s [-n RUNS] [-w WARMUPS] [-r RAWDIR] [--header]\n"
+		"usage: %s [-n RUNS] [-w WARMUPS] [-r RAWDIR] [-f] [--header]\n"
 		"\n"
 		"  -n RUNS      measured executions (default %d; the paper uses 5)\n"
 		"  -w WARMUPS   discarded executions before measuring (default %d)\n"
 		"  -r RAWDIR    write per-run samples to RAWDIR/raw_<bench>.csv\n"
+		"  -f           cold cache: evict L1/L2/L3 and invalidate the I-cache\n"
+		"               before every measured run. Without it the numbers are\n"
+		"               steady-state throughput, not a worst-case proxy.\n"
 		"  --header     print the CSV header line and exit\n"
 		"\n"
 		"stdout carries one machine-readable CSV row; the human-readable\n"
@@ -177,7 +269,7 @@ static void usage(const char *argv0)
 
 int main(int argc, char **argv)
 {
-	int n = DEFAULT_RUNS, warmups = DEFAULT_WARMUPS;
+	int n = DEFAULT_RUNS, warmups = DEFAULT_WARMUPS, cold = 0;
 	const char *rawdir = NULL;
 	uint64_t *ticks;
 	uint64_t f_timer, f_cpu_before, f_cpu_after, f_cpu;
@@ -197,6 +289,8 @@ int main(int argc, char **argv)
 			warmups = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-r") && i + 1 < argc) {
 			rawdir = argv[++i];
+		} else if (!strcmp(argv[i], "-f")) {
+			cold = 1;
 		} else {
 			usage(argv[0]);
 			return 2;
@@ -222,6 +316,17 @@ int main(int argc, char **argv)
 	cpu = sched_getcpu();
 	f_cpu_before = cpu_freq_hz(cpu);
 
+	if (cold && flush_init() != 0) {
+		fprintf(stderr, "[%s] warning: cannot allocate the %u MiB eviction "
+				"buffer; falling back to warm cache\n",
+			BENCH_NAME, FLUSH_BYTES >> 20);
+		cold = 0;
+	}
+	if (cold && text_hi == text_lo)
+		fprintf(stderr, "[%s] warning: could not locate our text segment in "
+				"/proc/self/maps; evicting data only, I-cache stays warm\n",
+			BENCH_NAME);
+
 	/* Cost of the instrumentation itself, so it can be judged against the
 	 * shorter benchmarks rather than assumed negligible. */
 	for (i = 0; i < 1000; i++) {
@@ -244,6 +349,8 @@ int main(int argc, char **argv)
 	for (i = 0; i < n; i++) {
 		uint64_t t0, t1;
 
+		if (cold)
+			cache_flush();
 		t0 = rd_cntvct();
 		sink = bench_entry();
 		t1 = rd_cntvct();
@@ -276,9 +383,9 @@ int main(int argc, char **argv)
 
 	/* ---- human-readable report (stderr) ---- */
 	fprintf(stderr,
-		"[%s] n=%d warmups=%d core=%d f_cpu=%.3f GHz f_timer=%.3f MHz "
+		"[%s] n=%d warmups=%d cache=%s core=%d f_cpu=%.3f GHz f_timer=%.3f MHz "
 		"(%.3f ns/tick, read overhead %llu ticks)\n",
-		BENCH_NAME, n, warmups, cpu,
+		BENCH_NAME, n, warmups, cold ? "COLD" : "warm", cpu,
 		f_cpu / 1e9, f_timer / 1e6, 1e9 / (double)f_timer,
 		(unsigned long long)overhead);
 	fprintf(stderr,

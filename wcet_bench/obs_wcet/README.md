@@ -25,27 +25,34 @@ mensagem explícita se você tentar. Compile na própria Pi.
 
 ```sh
 # copie o diretório de benchmarks inteiro; o Makefile lê ../<nome>.c
-scp -r /home/tassany/Documents/Codes/wcet_bench pi@raspberrypi:~/
+scp -r /home/tassany/Documents/Codes/Real-time-middleware/wcet_bench pi@raspberrypi:~/
 
 # na Pi:
 cd ~/wcet_bench/obs_wcet
-sudo ./run_all.sh              # N=20 (padrão)
-sudo ./run_all.sh -n 5         # replica o N=5 exato do paper
+sudo ./run_all.sh -f           # cache fria, N=20  <- use este
+sudo ./run_all.sh -f -n 5      # cache fria, N=5 exato do paper
+sudo ./run_all.sh              # cache quente, para comparar
 ```
+
+**Use `-f`.** Sem ele o harness mede regime permanente, que não é comparável com
+nenhuma estimativa de WCET estático — veja "Cache fria vs. quente" abaixo.
 
 Sem `sudo` também roda: perde SCHED_FIFO e o governor `performance`, fica mais
 ruidoso, e o `env.txt` registra que a isolação foi parcial.
 
-Opções: `-n RUNS`, `-w WARMUPS` (padrão 1), `-c CORE` (padrão 3), `-o OUTDIR`.
-Para trocar o nível de otimização: `OPT=-O2 ./run_all.sh`.
+Opções: `-n RUNS`, `-w WARMUPS` (padrão 1), `-c CORE` (padrão 3), `-f`,
+`-o OUTDIR`. Para trocar o nível de otimização: `OPT=-O2 ./run_all.sh`.
 
 ## Saídas
 
+Em `results/`, ou `results-cold/` quando você passa `-f`, para que uma bateria
+nunca sobrescreva a outra.
+
 | arquivo | conteúdo |
 |---|---|
-| `results/observed_wcet.csv` | uma linha por benchmark — o entregável |
-| `results/raw_<bench>.csv` | cada execução individual (`benchmark,run,ticks,us,cycles`) |
-| `results/env.txt` | kernel, modelo, GCC, governor, frequências, isolação, flags |
+| `observed_wcet.csv` | uma linha por benchmark — o entregável |
+| `raw_<bench>.csv` | cada execução individual (`benchmark,run,ticks,us,cycles`) |
+| `env.txt` | kernel, modelo, GCC, governor, frequências, isolação, estado da cache, flags |
 
 Colunas de `observed_wcet.csv`:
 
@@ -63,6 +70,46 @@ pior caso. O relatório no terminal mostra os dois lado a lado com a razão
 `max/mean`. Nenhum dos dois é um limite superior seguro: medição só reporta
 caminhos que por acaso executaram.
 
+## Cache fria vs. quente — a ressalva mais importante
+
+Sem `-f`, o harness executa N vezes seguidas dentro do mesmo processo. Código,
+dados e page tables ficam residentes em L1, e o que se mede é **throughput em
+regime permanente**, não pior caso. A análise estática de WCET — inclusive a
+ferramenta derivada do Chronos com a qual este experimento existe para comparar
+— assume **cache vazia na entrada do programa**. Comparar uma estimativa dessas
+contra uma medição com cache quente é comparar coisas diferentes.
+
+A evidência empírica disso, medindo os valores da Figura 10 do paper (Pi 4B)
+contra uma primeira bateria nossa com cache quente (Pi 5), no `cnt`:
+
+| | ciclos por elemento |
+|---|---|
+| nosso, cache quente | 27 |
+| paper | 356 |
+
+356 ciclos por elemento é latência de DRAM. O mesmo padrão apareceu em `bs`
+(54x), `fft1` (60x) e `expint` (23x) — todos benchmarks pequenos, onde o
+conjunto de trabalho cabe inteiro em L1 e a diferença entre frio e quente é
+justamente o que domina.
+
+Com `-f`, antes de cada execução medida o harness:
+
+- percorre um buffer de 8 MiB, lendo e depois sujando cada linha, o que passa
+  por L1D (64 KiB), L2 (512 KiB por núcleo) e L3 (2 MiB compartilhado) da Pi 5;
+- chama `__builtin___clear_cache()` sobre o próprio segmento de texto, o que em
+  AArch64 emite `DC CVAU` + `IC IVAU` — ambos permitidos em EL0 porque o Linux
+  liga `SCTLR_EL1.UCI`. O intervalo do texto vem de `/proc/self/maps`, então
+  cobre o benchmark e tudo que ele chama, sem chute.
+
+Os warm-ups continuam rodando antes da bateria mesmo em modo frio. Eles
+pré-faltam o `.bss` do benchmark e crescem a pilha, mantendo custo de page fault
+fora das amostras: a ferramenta de referência modela caches e declara
+explicitamente que **não** modela TLB nem paginação.
+
+**Limite conhecido:** o preditor de saltos e o histórico do prefetcher não são
+alcançáveis de EL0 e continuam quentes. Os números do modo frio são um limite
+*inferior* de uma partida a frio de verdade, não superior.
+
 ## Três ressalvas sobre a fidelidade ao paper
 
 **1. O generic timer não conta ciclos de CPU.** O paper diz "execution time in
@@ -74,11 +121,20 @@ independente do clock do núcleo. As colunas de ciclos aqui são **derivadas**,
 sai aviso). Ticks, µs e ciclos ficam em colunas separadas para a conversão ser
 auditável em vez de embutida.
 
-**2. Benchmarks curtos batem no piso do timer.** A 18,52 ns/tick, `bs` e
-provavelmente `cnt` executam em poucos ticks e os dígitos finais são
-quantização, não sinal. O harness avisa no stderr quando a mediana fica abaixo
-de 50 ticks. Interprete essas linhas como ordem de grandeza. O overhead da
-própria leitura do timer é medido e reportado no cabeçalho de cada benchmark.
+**2. Benchmarks curtos batem no piso do timer.** A 18,52 ns/tick, `bs` mede 3–4
+ticks com cache quente e os dígitos finais são quantização, não sinal. O harness
+avisa no stderr quando a mediana fica abaixo de 50 ticks. O modo `-f` alivia
+isso de quebra: com cache fria os mesmos benchmarks sobem para centenas de
+ticks e saem do piso. O overhead da própria leitura do timer é medido e
+reportado no cabeçalho de cada benchmark.
+
+**2b. Rode sempre com o governor travado.** O `run_all.sh` força `performance`
+quando tem privilégio, e não é detalhe: em validação num laptop x86 sem o
+governor travado, o laço de flush do modo frio funcionou como rampa de DVFS e
+levou o núcleo de 1,97 para 4,7 GHz, invertendo o sinal do resultado. Na Pi 5
+com `performance` o `env.txt` mostra `cur/min/max = 2400000/1500000/2400000` e o
+problema não existe. Se o `env.txt` indicar que o governor não foi travado,
+descarte a bateria — o harness ainda avisa se o clock mudar durante a corrida.
 
 **3. Tamanhos de entrada são os originais do Mälardalen.** O paper alterou o
 `insertsort` para 1024 elementos ("we changed the length of the target reversed
