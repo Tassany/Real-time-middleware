@@ -29,12 +29,15 @@ CXX      ?= g++
 # Ate' la', o compilador faz o que o codigo-fonte manda, e nada mais.
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O0 -g
 
-ETAPAS := etapa1
+ETAPAS := etapa1 etapa2
 
 .PHONY: all clean
 all: $(ETAPAS)
 
 etapa1: etapa1.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+etapa2: etapa2.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 clean:
