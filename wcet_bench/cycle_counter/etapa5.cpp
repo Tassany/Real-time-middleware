@@ -81,6 +81,79 @@
 
 extern "C" void bench_entry();
 
+/* ================================================================== */
+/* bsort100: um endereco de memoria cravado na fonte                  */
+/* ================================================================== */
+/*
+ * bsort100.c abre com isto:
+ *
+ *     #define KNOWN_VALUE (int)(*((char *)0x80200001))
+ *
+ * e usa a macro em Initialize(). Ou seja, o benchmark LE' O ENDERECO ABSOLUTO
+ * 0x80200001 esperando encontrar o valor 1 la' dentro. O comentario da fonte
+ * diz a intencao: "uma leitura deste endereco resultara' num valor conhecido
+ * de 1".
+ *
+ * Isso funcionava no ambiente para o qual o benchmark foi escrito, um simulador
+ * ou uma placa sem sistema operacional, onde o programa enxerga o mapa de
+ * memoria fisica cru e aquele endereco tinha um valor fixo cravado.
+ *
+ * Num processo Linux nao existe mapa fisico. Cada processo tem um ESPACO DE
+ * ENDERECAMENTO VIRTUAL proprio, e o kernel so' liga um endereco virtual a
+ * memoria fisica quando alguem pede. Enderecos que ninguem pediu ficam sem
+ * traducao, e le-los gera uma falha de pagina que o kernel nao sabe resolver.
+ * O resultado e' SIGSEGV, que e' o "Segmentation fault" que voce viu.
+ *
+ * O conserto poderia ser editar a fonte e trocar a macro por 1. Nos nao vamos
+ * fazer isso, porque a fonte intocada e' o que garante que voce esta' medindo o
+ * mesmo programa que os outros trabalhos da area medem. Em vez disso, pedimos
+ * ao kernel a pagina que falta:
+ *
+ *     mmap(0x80200000, 4096, ...) e escrevemos 1 no byte 1.
+ *
+ * mmap com MAP_FIXED_NOREPLACE pede um endereco ESPECIFICO, e falha em vez de
+ * mover a mapeamento para outro lugar se aquela regiao ja' estiver ocupada. O
+ * endereco precisa ser multiplo do tamanho da pagina, e 0x80200000 e'.
+ * Depois disso, ler 0x80200001 devolve 1, exatamente como o benchmark supunha,
+ * e o programa em disco continua intocado.
+ */
+#ifdef MAPEAR_ENDERECO_FIXO
+
+#include <sys/mman.h>
+#include <unistd.h>
+
+/* MAP_FIXED_NOREPLACE existe a partir do Linux 4.17. Se a libc for antiga,
+ * cai para MAP_FIXED, que faz a mesma coisa mas sobrescreve em silencio um
+ * mapeamento existente em vez de reclamar. */
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE MAP_FIXED
+#endif
+
+static void mapear_endereco_fixo()
+{
+	void *base = (void *)0x80200000UL;
+	size_t tam = (size_t)sysconf(_SC_PAGESIZE);
+
+	void *p = mmap(base, tam, PROT_READ | PROT_WRITE,
+		       MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+
+	if (p == MAP_FAILED || p != base) {
+		fprintf(stderr,
+			"erro: nao consegui mapear a pagina em 0x80200000 que o "
+			"bsort100 le'.\n");
+		exit(1);
+	}
+
+	unsigned char *b = (unsigned char *)p;
+
+	b[1] = 1;   /* KNOWN_VALUE, o unico que bsort100 usa */
+	b[3] = 1;   /* UNKNOWN_VALUE, definido na fonte mas nunca chamado */
+}
+
+#else
+static void mapear_endereco_fixo() { }
+#endif
+
 /* ------------------------------------------- instrumento (vem da etapa 3) */
 
 static inline uint64_t ler_contador()
@@ -176,6 +249,8 @@ int main(int argc, char **argv)
 	uint64_t f_timer = ler_cntfrq();
 	double ns_por_tick = f_timer ? 1e9 / (double)f_timer : 0.0;
 
+	mapear_endereco_fixo();
+
 	uint64_t *amostras = new uint64_t[n];
 
 	for (int i = 0; i < aquecimentos; i++) {
@@ -239,15 +314,23 @@ int main(int argc, char **argv)
 	printf("  media/mediana                 %6.3f\n",
 	       mediana > 0 ? media / mediana : 0.0);
 
-	/* O piso do instrumento medido na etapa 3 foi de 2 ticks. Um benchmark
-	 * que mede poucas dezenas de ticks esta' na faixa onde a regua nao
-	 * resolve, e os digitos finais sao quantizacao, nao sinal. Dizer isso e'
-	 * mais util do que reportar o numero como se fosse solido. */
-	if (mediana < 50.0)
-		printf("  AVISO: mediana de %.1f ticks esta' perto do piso do "
-		       "instrumento (2 ticks).\n"
-		       "         Este benchmark e' curto demais para esta regua de "
-		       "%.2f ns.\n", mediana, ns_por_tick);
+	/* O problema nao e' so' o piso do instrumento (2 ticks), e' a
+	 * QUANTIZACAO. A menor divisao da regua vale 1 tick. Se a medida inteira
+	 * cabe em poucas dezenas de ticks, o erro de arredondamento e' uma fatia
+	 * enorme do resultado, e os digitos finais do "WCET observado" sao ruido
+	 * de discretizacao, nao propriedade do programa. */
+	double res_rel = mediana > 0 ? 100.0 / mediana : 0.0;
+
+	printf("  resolucao relativa (1 tick)   %6.2f %%\n", res_rel);
+
+	if (mediana < 100.0)
+		printf("  AVISO: mediana de %.1f ticks. A regua de %.2f ns nao "
+		       "resolve este benchmark;\n"
+		       "         a dispersao acima e' majoritariamente quantizacao. "
+		       "Numero NAO utilizavel.\n", mediana, ns_por_tick);
+	else if (mediana < 1000.0)
+		printf("  ATENCAO: mediana de %.1f ticks da' so' %.2f %% de "
+		       "resolucao. Use com ressalva.\n", mediana, res_rel);
 
 	delete[] ordenadas;
 	delete[] amostras;

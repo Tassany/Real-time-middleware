@@ -101,6 +101,13 @@ BENCH_CFLAGS := -std=gnu89 -O0 -g -fno-builtin -fno-stack-protector -w \
 DEFS_bsort100 := -DWCSIM -DWORSTCASE
 DEFS_matmult  := -DUPPSALAWCET
 
+# Defines do lado do harness, tambem por benchmark.
+#   MAPEAR_ENDERECO_FIXO  bsort100.c le' o endereco absoluto 0x80200001,
+#                         herdado de um ambiente sem sistema operacional. Num
+#                         processo Linux isso e' SIGSEGV. O harness mapeia a
+#                         pagina antes de rodar. Ver o comentario em etapa5.cpp.
+HDEFS_bsort100 := -DMAPEAR_ENDERECO_FIXO
+
 BINS := $(addprefix bin/,$(BENCHES))
 
 .PHONY: etapa5
@@ -113,7 +120,7 @@ obj/%.o: $(SRCDIR)/%.c | obj
 	$(CC) $(BENCH_CFLAGS) $(DEFS_$*) -c -o $@ $<
 
 obj/arn_%.o: etapa5.cpp | obj
-	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
 
 .SECONDARY: $(addprefix obj/,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn_,$(addsuffix .o,$(BENCHES)))
