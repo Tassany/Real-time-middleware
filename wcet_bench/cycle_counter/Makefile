@@ -52,5 +52,75 @@ etapa3-O2: etapa3.cpp
 etapa4: etapa4.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
+# ---------------------------------------------------------------------------
+# Etapa 5: um binario por benchmark, em bin/.
+#
+#   bin/<nome> = obj/<nome>.o  (a fonte Malardalen em ../<nome>.c)
+#              + obj/arn_<nome>.o  (etapa5.cpp, com -DBENCH_NAME)
+#
+# As fontes em ../ nunca sao modificadas. Toda a adaptacao esta' nas flags.
+# ---------------------------------------------------------------------------
+BENCHES := bsort100 crc fft1 matmult ud statemate
+SRCDIR  := ..
+# Atribuicao simples, e nao ?=, porque o make ja' vem com CC=cc predefinido e
+# um ?= nunca teria efeito. Passar CC=... na linha de comando continua valendo.
+CC      = gcc
+
+# -std=gnu89        as fontes sao de 2000-2005 e usam construcoes que o C
+#                   moderno REJEITA: bsort100.c define funcoes no estilo K&R
+#                   (`Initialize(Array) int Array[];`) e declara `main()` com
+#                   tipo de retorno implicito. Em gnu89 as duas coisas sao
+#                   legais. Nao e' preciosismo, sem isso nao compila.
+# -O0               convencao da area de WCET, e a razao esta' na etapa 3:
+#                   otimizacao muda (e as vezes apaga) o codigo medido.
+# -fno-builtin      fft1.c define os proprios sin, cos, log e fabs estaticos.
+#                   Sem esta flag o GCC pode substitui-los pelas versoes dele e
+#                   voce mede um programa diferente do que esta' no arquivo.
+# -fno-stack-protector
+#                   Debian compila o GCC com -fstack-protector-strong ligado por
+#                   padrao, o que injeta carga e comparacao de canario em toda
+#                   funcao com vetor local. Isso e' codigo do compilador dentro
+#                   da regiao medida, ausente do fonte e ausente do grafo que um
+#                   analisador estatico enxerga. Desligar mantem o programa
+#                   medido fiel ao programa escrito.
+# -w                silencia os avisos das fontes antigas, que sao muitos e
+#                   enterrariam qualquer aviso vindo do harness.
+# -Dmain=bench_entry
+#                   renomeia o main() do benchmark sem tocar no arquivo.
+BENCH_CFLAGS := -std=gnu89 -O0 -g -fno-builtin -fno-stack-protector -w \
+                -Dmain=bench_entry
+
+# Defines especificos de cada fonte.
+#   WCSIM        bsort100.c: silencia os printf do relatorio
+#   WORSTCASE    bsort100.c: inicializa o vetor em ordem INVERTIDA, que e' o
+#                pior caso do bubble sort e o unico que faz sentido num
+#                experimento de WCET
+#   UPPSALAWCET  matmult.c: silencia os printf e o #include de <sys/times.h>
+# crc.c e fft1.c ja' guardam os printf deles atras de #ifdef DEBUG.
+# Um write() dentro da regiao medida custaria mais que o benchmark inteiro.
+DEFS_bsort100 := -DWCSIM -DWORSTCASE
+DEFS_matmult  := -DUPPSALAWCET
+
+BINS := $(addprefix bin/,$(BENCHES))
+
+.PHONY: etapa5
+etapa5: $(BINS)
+
+bin obj:
+	@mkdir -p $@
+
+obj/%.o: $(SRCDIR)/%.c | obj
+	$(CC) $(BENCH_CFLAGS) $(DEFS_$*) -c -o $@ $<
+
+obj/arn_%.o: etapa5.cpp | obj
+	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' -c -o $@ $<
+
+.SECONDARY: $(addprefix obj/,$(addsuffix .o,$(BENCHES))) \
+            $(addprefix obj/arn_,$(addsuffix .o,$(BENCHES)))
+
+bin/%: obj/%.o obj/arn_%.o | bin
+	$(CXX) -o $@ $^ -lm
+
 clean:
 	rm -f $(ETAPAS)
+	rm -rf bin obj
