@@ -224,6 +224,38 @@ static void alvo_descartado(bool proteger)
 	/* sem `proteger`, `local` morre aqui sem nunca ter sido lido */
 }
 
+/*
+ * Segundo alvo descartavel, e o contraste importante com o de cima.
+ *
+ * "Poder apagar" e "conseguir apagar" sao coisas diferentes. Para remover um
+ * trecho morto, o compilador precisa PROVAR que ele e' morto, e a dificuldade
+ * dessa prova depende inteiramente do formato do codigo.
+ *
+ * O insertion sort acima e' dificil: laco aninhado, o laco interno tem numero
+ * de iteracoes que depende dos dados, e ha' leituras e escritas entrelacadas no
+ * mesmo vetor. O GCC desiste e mantem tudo, mesmo sabendo que o resultado
+ * nunca e' lido.
+ *
+ * Este aqui e' facil: um unico laco, uma unica variavel escalar, nenhum acesso
+ * a memoria. O GCC ve na hora que `x` nunca e' lido e remove o laco inteiro.
+ *
+ * A recorrencia e' a de um gerador congruencial linear, escolhida de proposito
+ * porque nao tem formula fechada. Um somatorio simples como `s += i` seria pior
+ * demonstracao, porque o GCC substituiria o laco pela formula de Gauss e o
+ * tempo cairia mesmo COM a protecao -- outra otimizacao destruindo a medicao,
+ * por um caminho diferente.
+ */
+static void alvo_lcg(bool proteger)
+{
+	uint32_t x = 12345;
+
+	for (int i = 0; i < 2000000; i++)
+		x = x * 1103515245u + 12345u;
+
+	if (proteger)
+		nao_otimize(&x);
+}
+
 /* ================================================================== */
 /* O PISO DO INSTRUMENTO                                              */
 /* ================================================================== */
@@ -311,7 +343,8 @@ int main()
 	printf("\n");
 
 	/* ---- o alvo descartavel: a demonstracao do defeito 3 ---- */
-	printf("ALVO DESCARTADO (vetor local, resultado nunca lido)\n");
+	printf("DESCARTADO 1 — insertion sort em vetor local\n");
+	printf("  (dificil de provar morto; espere que o compilador NAO apague)\n");
 
 	uint64_t c0 = ler_correta();
 	alvo_descartado(false);
@@ -322,6 +355,20 @@ int main()
 	alvo_descartado(true);
 	uint64_t d1 = ler_correta();
 	linha("com nao_otimize()", d1 - d0);
+	printf("\n");
+
+	printf("DESCARTADO 2 — recorrencia LCG em escalar local\n");
+	printf("  (facil de provar morto; em -O2 espere o colapso ate' o piso)\n");
+
+	uint64_t e0 = ler_correta();
+	alvo_lcg(false);
+	uint64_t e1 = ler_correta();
+	linha("sem nao_otimize()", e1 - e0);
+
+	uint64_t f0 = ler_correta();
+	alvo_lcg(true);
+	uint64_t f1 = ler_correta();
+	linha("com nao_otimize()", f1 - f0);
 	printf("\n");
 
 	printf("  vetor[0]=%d  vetor[%d]=%d  (ordenado: %s)\n",
