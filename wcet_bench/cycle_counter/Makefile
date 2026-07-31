@@ -110,12 +110,14 @@ HDEFS_bsort100 := -DMAPEAR_ENDERECO_FIXO
 
 BINS5 := $(addprefix bin5/,$(BENCHES))
 BINS6 := $(addprefix bin6/,$(BENCHES))
+BINS7 := $(addprefix bin7/,$(BENCHES))
 
-.PHONY: etapa5 etapa6
+.PHONY: etapa5 etapa6 etapa7
 etapa5: $(BINS5)
 etapa6: $(BINS6)
+etapa7: $(BINS7)
 
-bin5 bin6 obj:
+bin5 bin6 bin7 obj:
 	@mkdir -p $@
 
 # O objeto da fonte Malardalen e' o mesmo para as duas etapas: quem muda e' o
@@ -129,9 +131,13 @@ obj/arn5_%.o: etapa5.cpp | obj
 obj/arn6_%.o: etapa6.cpp | obj
 	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
 
+obj/arn7_%.o: etapa7.cpp | obj
+	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
+
 .SECONDARY: $(addprefix obj/,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn5_,$(addsuffix .o,$(BENCHES))) \
-            $(addprefix obj/arn6_,$(addsuffix .o,$(BENCHES)))
+            $(addprefix obj/arn6_,$(addsuffix .o,$(BENCHES))) \
+            $(addprefix obj/arn7_,$(addsuffix .o,$(BENCHES)))
 
 bin5/%: obj/%.o obj/arn5_%.o | bin5
 	$(CXX) -o $@ $^ -lm
@@ -139,6 +145,30 @@ bin5/%: obj/%.o obj/arn5_%.o | bin5
 bin6/%: obj/%.o obj/arn6_%.o | bin6
 	$(CXX) -o $@ $^ -lm
 
+bin7/%: obj/%.o obj/arn7_%.o | bin7
+	$(CXX) -o $@ $^ -lm
+
+# ---------------------------------------------------------------------------
+# A bateria completa: roda os seis e junta numa tabela.
+#
+#   sudo make medir            n=5 (o numero do paper), 1 aquecimento
+#   sudo make medir N=100 W=5  mais amostras e mais aquecimento
+#
+# O relatorio de cada benchmark continua indo para a tela (stderr); so' a linha
+# de CSV entra no arquivo (stdout).
+# ---------------------------------------------------------------------------
+N ?= 5
+W ?= 1
+CSV ?= resultados.csv
+
+.PHONY: medir
+medir: $(BINS7)
+	@./bin7/$(firstword $(BENCHES)) --header > $(CSV)
+	@for b in $(BENCHES); do ./bin7/$$b -n $(N) -w $(W) >> $(CSV); done
+	@echo
+	@echo "==> $(CSV)"
+	@column -s, -t $(CSV) 2>/dev/null || cat $(CSV)
+
 clean:
-	rm -f $(ETAPAS)
-	rm -rf bin bin5 bin6 obj
+	rm -f $(ETAPAS) $(CSV)
+	rm -rf bin bin5 bin6 bin7 obj
