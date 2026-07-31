@@ -14,12 +14,23 @@
 #   -C $(KDIR)   entra no diretorio de build do kernel e usa o Makefile de la'
 #   M=$(PWD)     diz a ele que o codigo-fonte do modulo esta' aqui
 #
-# Pre-requisito na Raspberry Pi OS:
+# Pre-requisito: os headers do kernel EM EXECUCAO, em /lib/modules/$(uname -r)/build.
 #
-#   sudo apt install raspberrypi-kernel-headers
+# O nome do pacote mudou ao longo das versoes do Raspberry Pi OS. O antigo
+# `raspberrypi-kernel-headers` nao existe mais no Bookworm em diante. Hoje os
+# pacotes seguem o sabor do kernel:
 #
-# Em outras distribuicoes o pacote costuma se chamar linux-headers-$(uname -r).
-# Se /lib/modules/$(uname -r)/build nao existir, e' isso que esta' faltando.
+#   linux-headers-rpi-2712     kernel especifico da Pi 5 (BCM2712)
+#   linux-headers-rpi-v8       kernel arm64 generico
+#   linux-headers-$(uname -r)  em distribuicoes que nao a Raspberry Pi OS
+#
+# Descubra o que existe com `apt-cache search linux-headers`.
+#
+# CASO SEM SAIDA: se o `uname -r` termina em `+` e nao contem `+rpt-`, o kernel
+# em execucao NAO veio do apt (foi instalado por rpi-update ou compilado a mao).
+# Nenhum pacote de headers vai casar com ele, porque o pacote e' gerado junto
+# com o kernel empacotado. As alternativas sao voltar para o kernel do apt ou
+# abandonar o modulo e ler os ciclos por perf_event_open.
 
 obj-m += pmu_el0.o
 
@@ -30,9 +41,18 @@ PWD  := $(shell pwd)
 
 all:
 	@test -d $(KDIR) || { \
-		echo "erro: $(KDIR) nao existe."; \
-		echo "      Instale os headers do kernel:"; \
-		echo "      sudo apt install raspberrypi-kernel-headers"; \
+		echo "erro: $(KDIR) nao existe, faltam os headers do kernel em uso."; \
+		echo "      kernel: $(shell uname -r)"; \
+		echo; \
+		echo "      Procure o pacote certo:"; \
+		echo "        apt-cache search linux-headers"; \
+		echo "      Na Raspberry Pi OS costuma ser um destes:"; \
+		echo "        sudo apt install linux-headers-rpi-2712   # Pi 5"; \
+		echo "        sudo apt install linux-headers-rpi-v8     # arm64 generico"; \
+		echo; \
+		echo "      Se o kernel acima termina em '+' e nao tem '+rpt-', ele nao"; \
+		echo "      veio do apt e nenhum pacote de headers vai casar. Veja o"; \
+		echo "      comentario no topo deste Makefile."; \
 		exit 1; }
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 

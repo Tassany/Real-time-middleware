@@ -1,17 +1,28 @@
 /*
- * etapa8.cpp — ciclos medidos de verdade, com PMCCNTR_EL0.
+ * etapa8.cpp — ciclos medidos de verdade, por dois caminhos.
  *
  * A etapa 7 fechou com um problema que ela nao podia resolver: quatro dos seis
  * benchmarks medem entre 12 e 46 ticks, e um tick vale 44 ciclos de nucleo. A
  * regua e' grossa demais.
  *
- * Esta etapa troca a regua. O PMCCNTR_EL0 conta CICLOS DE NUCLEO, um a um, o
- * que da' 44 vezes mais resolucao e mede diretamente a grandeza que o paper
- * reporta, em vez de deriva-la de uma medicao de tempo.
+ * Esta etapa troca a regua. O contador de ciclos da PMU conta CICLOS DE NUCLEO,
+ * um a um, o que da' 44 vezes mais resolucao e mede diretamente a grandeza que
+ * o paper reporta, em vez de deriva-la de uma medicao de tempo.
  *
- * EXIGE O MODULO DE KERNEL de etapa8_pmu/ carregado. Sem ele a instrucao de
- * leitura gera SIGILL. O programa detecta isso e explica, em vez de morrer com
- * "Illegal instruction" e deixar voce adivinhando.
+ * DUAS FORMAS DE CHEGAR NO MESMO CONTADOR DE HARDWARE:
+ *
+ *   mrs    le' PMCCNTR_EL0 diretamente, uma instrucao, o mais barato que existe.
+ *          Exige o modulo de kernel de etapa8_pmu/ carregado, porque o acesso a
+ *          partir de EL0 vem bloqueado. Sem ele, SIGILL.
+ *
+ *   perf   abre o mesmo contador por perf_event_open() e le' com read(). Nao
+ *          exige modulo nenhum, e' o caminho para maquinas onde os headers do
+ *          kernel nao estao disponiveis. Custa uma chamada de sistema por
+ *          leitura, o que parece proibitivo e nao e', pelo motivo explicado
+ *          junto do codigo.
+ *
+ * O programa escolhe sozinho, na ordem acima, e diz qual usou. Se nenhuma
+ * estiver disponivel ele ainda roda, reportando as colunas da etapa 7.
  *
  * O QUE ESTA ETAPA MEDE, e e' o ponto:
  *
@@ -96,7 +107,10 @@
 
 #include <sched.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+#include <linux/perf_event.h>
 
 #ifndef BENCH_NAME
 #define BENCH_NAME "desconhecido"
@@ -357,17 +371,135 @@ static bool pmu_contando()
 	return b > a;
 }
 
-static uint64_t medir_piso_pmu()
+/* ================================================================== */
+/* SEGUNDA FONTE DE CICLOS: perf_event_open, sem modulo de kernel     */
+/* ================================================================== */
+/*
+ * O caminho do `mrs` acima e' o mais barato que existe, uma instrucao, mas
+ * depende de alguem ter carregado o modulo. Nem sempre da': numa placa com
+ * kernel compilado a mao, os headers necessarios para construir o modulo podem
+ * simplesmente nao estar la'.
+ *
+ * Existe um segundo caminho para o MESMO contador de hardware, que nao exige
+ * modulo nenhum: pedir ao proprio kernel que o gerencie para voce.
+ *
+ * perf_event_open() e' a chamada de sistema por tras do comando `perf`. Voce
+ * descreve o evento que quer numa struct e recebe um descritor de arquivo; ler
+ * esse descritor devolve a contagem acumulada. Pedindo
+ * PERF_COUNT_HW_CPU_CYCLES voce recebe exatamente o PMCCNTR_EL0, so' que
+ * multiplexado e salvo pelo kernel a cada troca de contexto, o que de quebra
+ * resolve o problema de a contagem ser por nucleo.
+ *
+ * O PROBLEMA OBVIO, e por que ele nao e' fatal.
+ *
+ * Ler o descritor e' um read(), uma chamada de sistema, que custa entre um e
+ * dois microssegundos. O statemate inteiro dura 0,22 us. Medir com um
+ * instrumento cinco vezes mais caro que o objeto medido seria absurdo.
+ *
+ * A saida e' o campo `exclude_kernel`. Com ele ligado, a PMU PARA DE CONTAR
+ * enquanto a CPU esta' em EL1. Todo o tempo gasto dentro do read(), que e'
+ * kernel, fica de fora da contagem. Sobra apenas a parte em espaco de usuario,
+ * que e' pequena e que a medicao de piso quantifica como qualquer outra.
+ *
+ * O preco disso e' que interrupcoes tambem deixam de ser contadas, entao a
+ * coluna de ciclos passa a medir so' o trabalho do seu programa. Comparada com
+ * a coluna de ticks, que continua correndo durante as interrupcoes, isso vira
+ * um detector: quando as duas discordam muito numa amostra, aquela amostra
+ * levou uma interrupcao.
+ *
+ * `pinned` pede que o contador fique no hardware o lote inteiro em vez de ser
+ * revezado com outros eventos, o que escalaria as contagens. `pid=0, cpu=-1`
+ * quer dizer "esta thread, em qualquer nucleo", e como a thread ja' esta' presa
+ * pelo sched_setaffinity da etapa 6, o contador segue o nucleo medido.
+ */
+
+static int perf_fd = -1;
+
+static bool perf_abrir()
+{
+	struct perf_event_attr attr;
+
+	memset(&attr, 0, sizeof(attr));
+	attr.type           = PERF_TYPE_HARDWARE;
+	attr.size           = sizeof(attr);
+	attr.config         = PERF_COUNT_HW_CPU_CYCLES;
+	attr.disabled       = 1;
+	attr.pinned         = 1;
+	attr.exclude_kernel = 1;
+	attr.exclude_hv     = 1;
+
+	long fd = syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0UL);
+
+	if (fd < 0)
+		return false;
+
+	perf_fd = (int)fd;
+
+	if (ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0) != 0 ||
+	    ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0) != 0) {
+		close(perf_fd);
+		perf_fd = -1;
+		return false;
+	}
+	return true;
+}
+
+static inline uint64_t perf_ler()
+{
+	uint64_t v = 0;
+
+	if (read(perf_fd, &v, sizeof(v)) != (ssize_t)sizeof(v))
+		return 0;
+	return v;
+}
+
+/* ================================================================== */
+/* QUAL FONTE DE CICLOS ESTA' DISPONIVEL                              */
+/* ================================================================== */
+
+enum fonte_ciclos {
+	CICLOS_NENHUM = 0,   /* so' o generic timer, como na etapa 7 */
+	CICLOS_MRS    = 1,   /* PMCCNTR_EL0 direto, precisa do modulo */
+	CICLOS_PERF   = 2    /* perf_event_open, nao precisa de nada  */
+};
+
+static const char *nome_fonte(int f)
+{
+	switch (f) {
+	case CICLOS_MRS:  return "mrs";
+	case CICLOS_PERF: return "perf";
+	default:          return "nenhuma";
+	}
+}
+
+static uint64_t medir_piso_pmu(int fonte)
 {
 	uint64_t menor = UINT64_MAX;
 
 	for (int i = 0; i < 1000; i++) {
-		uint64_t t1, t2, c1, c2;
+		uint64_t d;
 
-		ler_ambos(&t1, &c1);
-		ler_ambos(&t2, &c2);
-		if (c2 - c1 < menor)
-			menor = c2 - c1;
+		if (fonte == CICLOS_MRS) {
+			uint64_t t1, t2, c1, c2;
+
+			ler_ambos(&t1, &c1);
+			ler_ambos(&t2, &c2);
+			d = c2 - c1;
+		} else {
+			/* Mesma forma da janela real: as duas leituras de tick ficam
+			 * DENTRO da janela de ciclos, entao o piso ja' inclui o custo
+			 * delas, que e' exatamente o que se quer descontar. */
+			uint64_t c1 = perf_ler();
+
+			(void)ler_contador();
+			(void)ler_contador();
+
+			uint64_t c2 = perf_ler();
+
+			d = c2 - c1;
+		}
+		if (d < menor)
+			menor = d;
 	}
 	return menor;
 }
@@ -670,7 +802,8 @@ static const char *CSV_CABECALHO =
 	"piso_ticks,piso_pct_mediana,incerteza_media_pct,"
 	/* acrescentado na etapa 8, sempre no fim */
 	"pmu_ok,min_pmucyc,mediana_pmucyc,media_pmucyc,max_pmucyc,"
-	"piso_pmucyc,razao_medido_derivado,resolucao_pmu_pct,dispersao_pmu_pct";
+	"piso_pmucyc,razao_medido_derivado,resolucao_pmu_pct,dispersao_pmu_pct,"
+	"fonte_ciclos";
 
 int main(int argc, char **argv)
 {
@@ -718,26 +851,47 @@ int main(int argc, char **argv)
 
 	mapear_endereco_fixo();
 
-	/* ---- o contador de ciclos esta' disponivel? ---- */
-	bool pmu_ok = pmu_acessivel();
+	/* ---- qual fonte de ciclos esta' disponivel? ----
+	 *
+	 * Preferimos o `mrs` quando existe, porque e' uma instrucao contra uma
+	 * chamada de sistema. Sem o modulo, caimos no perf_event_open, que mede o
+	 * mesmo contador de hardware por outro caminho. Sem nenhum dos dois, o
+	 * programa ainda roda e reporta as colunas da etapa 7. */
+	int fonte = CICLOS_NENHUM;
 
-	if (pmu_ok && !pmu_contando()) {
-		fprintf(stderr,
-			"[%s] aviso: PMCCNTR_EL0 e' legivel mas nao avanca. O modulo\n"
-			"      autorizou o acesso mas o contador esta' parado (PMCR_EL0.E\n"
-			"      ou PMCNTENSET_EL0). Recarregue: cd etapa8_pmu && make unload"
-			" load\n", BENCH_NAME);
-		pmu_ok = false;
+	if (pmu_acessivel()) {
+		if (pmu_contando())
+			fonte = CICLOS_MRS;
+		else
+			fprintf(stderr,
+				"[%s] aviso: PMCCNTR_EL0 e' legivel mas nao avanca. O modulo\n"
+				"      autorizou o acesso mas o contador esta' parado. "
+				"Recarregue:\n"
+				"      cd etapa8_pmu && make unload load\n", BENCH_NAME);
 	}
-	if (!pmu_ok)
-		fprintf(stderr,
-			"[%s] aviso: PMCCNTR_EL0 inacessivel (SIGILL). O modulo de kernel\n"
-			"      nao esta' carregado. Sem ele esta etapa reporta apenas as\n"
-			"      colunas da etapa 7, derivadas do generic timer.\n"
-			"      Para carregar:  cd etapa8_pmu && make load\n", BENCH_NAME);
+
+	if (fonte == CICLOS_NENHUM) {
+		if (perf_abrir()) {
+			fonte = CICLOS_PERF;
+			fprintf(stderr,
+				"[%s] PMCCNTR_EL0 direto indisponivel (modulo nao carregado); "
+				"usando perf_event_open.\n", BENCH_NAME);
+		} else {
+			fprintf(stderr,
+				"[%s] aviso: nenhuma fonte de ciclos disponivel.\n"
+				"      mrs   -> SIGILL, modulo de kernel nao carregado\n"
+				"      perf  -> %s\n"
+				"      Verifique /proc/sys/kernel/perf_event_paranoid (precisa "
+				"ser <= 2)\n"
+				"      ou rode com sudo. Seguindo so' com o generic timer.\n",
+				BENCH_NAME, strerror(errno));
+		}
+	}
+
+	bool pmu_ok = (fonte != CICLOS_NENHUM);
 
 	uint64_t piso = medir_piso();
-	uint64_t piso_pmu = pmu_ok ? medir_piso_pmu() : 0;
+	uint64_t piso_pmu = pmu_ok ? medir_piso_pmu(fonte) : 0;
 
 	uint64_t *amostras = new uint64_t[n];
 	uint64_t *ciclos_medidos = new uint64_t[n];
@@ -747,24 +901,54 @@ int main(int argc, char **argv)
 		barreira();
 	}
 
-	/* Os dois contadores na mesma janela. Quando o PMU nao esta' disponivel
-	 * caimos na leitura simples da etapa 7, para o programa continuar util. */
-	for (int i = 0; i < n; i++) {
-		uint64_t t0, t1, c0 = 0, c1 = 0;
+	/* Tres lacos em vez de um com if dentro. A escolha da fonte e' fixa para o
+	 * lote inteiro, entao decidir uma vez aqui fora mantem a regiao medida sem
+	 * um desvio condicional que nao faz parte do que se quer medir. */
+	if (fonte == CICLOS_MRS) {
+		/* Ambos os contadores na mesma janela, com uma barreira so'. */
+		for (int i = 0; i < n; i++) {
+			uint64_t t0, t1, c0, c1;
 
-		if (pmu_ok) {
 			ler_ambos(&t0, &c0);
 			bench_entry();
 			ler_ambos(&t1, &c1);
-		} else {
-			t0 = ler_contador();
-			bench_entry();
-			t1 = ler_contador();
-		}
 
-		barreira();
-		amostras[i] = t1 - t0;
-		ciclos_medidos[i] = c1 - c0;
+			barreira();
+			amostras[i] = t1 - t0;
+			ciclos_medidos[i] = c1 - c0;
+		}
+	} else if (fonte == CICLOS_PERF) {
+		/* A janela de ciclos envolve a de ticks, por fora. Tem que ser assim:
+		 * perf_ler() e' um read(), e uma chamada de sistema dentro da janela de
+		 * ticks entraria inteira na contagem de tempo. Por fora ela nao entra,
+		 * e o exclude_kernel garante que o tempo dela tambem nao entra na
+		 * contagem de ciclos. O preco e' que as duas leituras de tick ficam
+		 * dentro da janela de ciclos, o que o piso ja' mede e desconta. */
+		for (int i = 0; i < n; i++) {
+			uint64_t c0 = perf_ler();
+			uint64_t t0 = ler_contador();
+
+			bench_entry();
+
+			uint64_t t1 = ler_contador();
+			uint64_t c1 = perf_ler();
+
+			barreira();
+			amostras[i] = t1 - t0;
+			ciclos_medidos[i] = c1 - c0;
+		}
+	} else {
+		for (int i = 0; i < n; i++) {
+			uint64_t t0 = ler_contador();
+
+			bench_entry();
+
+			uint64_t t1 = ler_contador();
+
+			barreira();
+			amostras[i] = t1 - t0;
+			ciclos_medidos[i] = 0;
+		}
 	}
 
 	uint64_t f_depois = freq_nucleo_hz(nucleo);
@@ -893,15 +1077,16 @@ int main(int argc, char **argv)
 		? mediana_pmu / ciclos_derivados : 0.0;
 
 	if (pmu_ok)
-		printf("1,%llu,%.1f,%.1f,%llu,%llu,%.4f,%.4f,%.1f\n",
+		printf("1,%llu,%.1f,%.1f,%llu,%llu,%.4f,%.4f,%.1f,%s\n",
 		       (unsigned long long)min_pmu, mediana_pmu, media_pmu,
 		       (unsigned long long)max_pmu, (unsigned long long)piso_pmu,
 		       razao,
 		       mediana_pmu > 0 ? 100.0 / mediana_pmu : 0.0,
 		       mediana_pmu > 0
-			       ? 100.0 * (double)(max_pmu - min_pmu) / mediana_pmu : 0.0);
+			       ? 100.0 * (double)(max_pmu - min_pmu) / mediana_pmu : 0.0,
+		       nome_fonte(fonte));
 	else
-		printf("0,,,,,,,,\n");   /* vazio, e nao zero */
+		printf("0,,,,,,,,,%s\n", nome_fonte(fonte));   /* vazio, e nao zero */
 	fflush(stdout);
 
 	/* ================================================================ */
@@ -928,9 +1113,10 @@ int main(int argc, char **argv)
 	fprintf(stderr, "  clock       %.0f MHz antes, %.0f MHz depois   %s\n",
 		f_antes / 1e6, f_depois / 1e6,
 		clock_estavel ? "estavel" : "<<< MUDOU");
-	fprintf(stderr, "  PMCCNTR_EL0 %s\n",
-		pmu_ok ? "acessivel e contando"
-		       : "<<< INDISPONIVEL (modulo de kernel nao carregado)");
+	fprintf(stderr, "  ciclos via  %-16s %s\n", nome_fonte(fonte),
+		fonte == CICLOS_MRS  ? "mrs pmccntr_el0, uma instrucao" :
+		fonte == CICLOS_PERF ? "perf_event_open, exclude_kernel=1" :
+				       "<<< INDISPONIVEL, so' o generic timer");
 
 	if (!ok_fifo || !ok_mlock)
 		fprintf(stderr,
@@ -984,7 +1170,8 @@ int main(int argc, char **argv)
 	/* ---- o confronto entre os dois instrumentos ---- */
 	if (pmu_ok) {
 		fprintf(stderr,
-			"CICLOS MEDIDOS (PMCCNTR_EL0)   contra   CICLOS DERIVADOS (etapa 7)\n");
+			"CICLOS MEDIDOS (via %s)   contra   CICLOS DERIVADOS (etapa 7)\n",
+			nome_fonte(fonte));
 		fprintf(stderr, "  minimo   %12llu\n", (unsigned long long)min_pmu);
 		fprintf(stderr, "  mediana  %12.1f", mediana_pmu);
 		if (clock_estavel)
@@ -1009,21 +1196,63 @@ int main(int argc, char **argv)
 				? 100.0 * (double)(max_pmu - min_pmu) / mediana_pmu : 0.0,
 			dispersao);
 
-		/* A razao e' o veredito sobre a etapa 7 inteira. */
+		/*
+		 * A razao e' o veredito sobre a etapa 7, mas o que ela significa
+		 * depende da fonte, e confundir os dois casos levaria a conclusao
+		 * errada.
+		 *
+		 * Com `mrs`, os dois instrumentos contam a mesma coisa: tudo que
+		 * acontece na janela, interrupcoes incluidas. A razao deveria dar 1,00,
+		 * e qualquer desvio acusa a conversao derivada.
+		 *
+		 * Com `perf` e exclude_kernel=1, nao. Os ciclos param de contar dentro
+		 * do kernel, enquanto os ticks continuam correndo durante interrupcoes.
+		 * A razao fica NATURALMENTE ABAIXO DE 1, e o quanto abaixo mede quanto
+		 * da janela foi gasto fora do seu programa. E' informacao, e nao erro.
+		 */
 		if (clock_estavel && ciclos_derivados > 0.0) {
 			double r = mediana_pmu / ciclos_derivados;
 
-			if (r > 0.98 && r < 1.02)
-				fprintf(stderr,
-					"\n  A conversao derivada da etapa 7 CONFERE (razao %.4f).\n"
-					"  ticks x f_nucleo / f_timer recuperava o numero certo.\n", r);
-			else
-				fprintf(stderr,
-					"\n  A conversao derivada da etapa 7 ERRAVA %.1f %% "
-					"(razao %.4f).\n"
-					"  A frequencia lida do sysfs nao descreve o que o nucleo\n"
-					"  realmente fez durante a medicao.\n",
-					(r - 1.0) * 100.0, r);
+			if (fonte == CICLOS_MRS) {
+				if (r > 0.98 && r < 1.02)
+					fprintf(stderr,
+						"\n  A conversao derivada da etapa 7 CONFERE "
+						"(razao %.4f).\n"
+						"  ticks x f_nucleo / f_timer recuperava o numero "
+						"certo.\n", r);
+				else
+					fprintf(stderr,
+						"\n  A conversao derivada da etapa 7 ERRAVA %.1f %% "
+						"(razao %.4f).\n"
+						"  A frequencia lida do sysfs nao descreve o que o "
+						"nucleo\n  realmente fez durante a medicao.\n",
+						(r - 1.0) * 100.0, r);
+			} else {
+				fprintf(stderr, "\n  razao %.4f, com exclude_kernel ligado.\n",
+					r);
+				if (r > 1.02)
+					fprintf(stderr,
+						"  Acima de 1, o que nao deveria acontecer: os ciclos "
+						"medidos excluem\n"
+						"  o kernel e os ticks nao, entao o medido tinha que "
+						"ser o menor.\n"
+						"  Suspeite da frequencia lida do sysfs.\n");
+				else if (r > 0.95)
+					fprintf(stderr,
+						"  Os dois instrumentos concordam, e a janela medida "
+						"ficou praticamente\n"
+						"  livre de interrupcoes. A conversao derivada da "
+						"etapa 7 se sustenta.\n");
+				else
+					fprintf(stderr,
+						"  %.1f %% da janela foi gasto FORA do seu programa, em "
+						"kernel: interrupcoes,\n"
+						"  tratadores de temporizador, preempcao. Os ticks "
+						"contam esse tempo e os\n"
+						"  ciclos nao. Nao e' erro de medicao, e' o custo do "
+						"sistema aparecendo.\n",
+						(1.0 - r) * 100.0);
+			}
 		}
 		fprintf(stderr, "\n");
 	}
@@ -1092,15 +1321,40 @@ int main(int argc, char **argv)
 	fprintf(stderr, "\n  max_confiavel = %d  (clock estavel, isolamento "
 			"completo, mediana >= 100 ticks)\n", max_confiavel ? 1 : 0);
 
-	/* O contador de ciclos e' POR NUCLEO e nucleos diferentes nao estao
-	 * sincronizados. Uma migracao no meio do lote corrompe todas as diferencas,
-	 * possivelmente produzindo valores negativos que aparecem como numeros
-	 * gigantes por serem sem sinal. */
-	if (pmu_ok && nucleo_real != nucleo)
-		fprintf(stderr,
-			"\n  ALERTA: a thread terminou no nucleo %d e nao no %d pedido.\n"
-			"    O PMCCNTR_EL0 e' por nucleo e os valores nao sao comparaveis\n"
-			"    entre nucleos. Descarte este lote.\n", nucleo_real, nucleo);
+	/*
+	 * Migracao de nucleo. A gravidade depende da fonte, e aqui as duas se
+	 * separam de verdade.
+	 *
+	 * Com `mrs` voce le' o registrador cru do nucleo onde estiver. Contadores de
+	 * nucleos diferentes nao sao sincronizados, entao uma migracao no meio da
+	 * janela corrompe a diferenca, que pode ate' ficar negativa e aparecer como
+	 * um numero gigantesco por ser sem sinal. O lote inteiro vai fora.
+	 *
+	 * Com `perf` nao. O kernel salva e restaura a contagem do evento a cada
+	 * troca de contexto, justamente para que ela acompanhe a THREAD e nao o
+	 * nucleo. A migracao ainda estraga a cache e o preditor, mas a contagem
+	 * continua correta.
+	 */
+	if (nucleo_real != nucleo) {
+		if (fonte == CICLOS_MRS)
+			fprintf(stderr,
+				"\n  ALERTA: a thread terminou no nucleo %d e nao no %d "
+				"pedido.\n"
+				"    Lendo o PMCCNTR_EL0 direto, contadores de nucleos "
+				"diferentes nao sao\n"
+				"    comparaveis. DESCARTE este lote.\n", nucleo_real, nucleo);
+		else
+			fprintf(stderr,
+				"\n  aviso: a thread terminou no nucleo %d e nao no %d "
+				"pedido.\n"
+				"    O perf acompanha a thread, entao a contagem continua "
+				"valida, mas a\n"
+				"    migracao esfriou cache e preditor e provavelmente inflou "
+				"algumas amostras.\n", nucleo_real, nucleo);
+	}
+
+	if (perf_fd >= 0)
+		close(perf_fd);
 
 	delete[] ord_pmu;
 	delete[] ciclos_medidos;

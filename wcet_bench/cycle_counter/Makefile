@@ -178,14 +178,20 @@ medir: $(BINS7)
 	@echo "==> $(CSV)"
 	@column -s, -t $(CSV) 2>/dev/null || cat $(CSV)
 
-# A mesma bateria com o contador de ciclos real. Exige o modulo carregado:
+# A mesma bateria com o contador de ciclos real:
 #
-#   cd etapa8_pmu && make load && cd ..
 #   sudo make medir8 N=100 W=5
-#   cd etapa8_pmu && make unload
 #
-# Sem o modulo os binarios ainda rodam, avisam, e preenchem so' as colunas da
-# etapa 7.
+# Os binarios escolhem sozinhos como chegar no contador, e dizem qual usaram na
+# coluna `fonte_ciclos` do CSV:
+#
+#   mrs    PMCCNTR_EL0 direto, uma instrucao. Exige o modulo de etapa8_pmu/
+#          carregado (cd etapa8_pmu && make load).
+#   perf   perf_event_open, sem modulo nenhum. E' a fonte usada quando os
+#          headers do kernel nao estao disponiveis para construir o modulo.
+#
+# Sem nenhuma das duas os binarios ainda rodam e preenchem so' as colunas da
+# etapa 7. O sudo continua valendo por causa do SCHED_FIFO e do mlockall.
 CSV8 ?= resultados_pmu.csv
 
 .PHONY: medir8
