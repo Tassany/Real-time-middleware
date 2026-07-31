@@ -220,10 +220,17 @@ fi
 # ------------------------------------------------------------------- report
 echo >&2
 echo "==> $CSV" >&2
+# Columns: 8/10 = mean/max us, 12/14 = cycles derived from ticks, 18/20 =
+# cycles counted by the PMU, 21 = whether the PMU column is populated. Prefer
+# the measured cycles when they exist and say which is being shown -- printing
+# the derived ones unlabelled invites reading a clock-scaled estimate as a
+# count, which is exactly the conflation this harness exists to avoid.
 awk -F, 'NR==1 { next }
 {
-	printf "  %-11s  mean %12.3f us  MAX %12.3f us  (max/mean %5.3f)  mean %14.1f cyc  MAX %14.1f cyc\n", \
-	       $1, $8, $10, ($8 > 0 ? $10/$8 : 0), $12, $14
+	if ($21 == 1) { mc = $18; xc = $20; src = "PMU" }
+	else          { mc = $12; xc = $14; src = "drv" }
+	printf "  %-14s  mean %12.3f us  MAX %12.3f us  (max/mean %5.3f)  mean %14.1f cyc  MAX %14.1f cyc  [%s]\n", \
+	       $1, $8, $10, ($8 > 0 ? $10/$8 : 0), mc, xc, src
 }' "$CSV" >&2
 
 cat >&2 <<'EOF'
