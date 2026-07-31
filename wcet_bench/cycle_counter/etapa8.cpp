@@ -1,4 +1,41 @@
 /*
+ * etapa8.cpp — ciclos medidos de verdade, com PMCCNTR_EL0.
+ *
+ * A etapa 7 fechou com um problema que ela nao podia resolver: quatro dos seis
+ * benchmarks medem entre 12 e 46 ticks, e um tick vale 44 ciclos de nucleo. A
+ * regua e' grossa demais.
+ *
+ * Esta etapa troca a regua. O PMCCNTR_EL0 conta CICLOS DE NUCLEO, um a um, o
+ * que da' 44 vezes mais resolucao e mede diretamente a grandeza que o paper
+ * reporta, em vez de deriva-la de uma medicao de tempo.
+ *
+ * EXIGE O MODULO DE KERNEL de etapa8_pmu/ carregado. Sem ele a instrucao de
+ * leitura gera SIGILL. O programa detecta isso e explica, em vez de morrer com
+ * "Illegal instruction" e deixar voce adivinhando.
+ *
+ * O QUE ESTA ETAPA MEDE, e e' o ponto:
+ *
+ * Os dois contadores sao lidos na MESMA janela, com uma unica barreira. Assim
+ * cada execucao produz um par: quantos ticks de generic timer e quantos ciclos
+ * de nucleo. A razao entre o valor medido e o valor derivado
+ * (ticks x f_nucleo / f_timer) testa empiricamente a suposicao em que toda a
+ * etapa 7 se apoiava. Se der 1,00, a conversao estava certa. Se nao der, voce
+ * descobre por quanto ela errava.
+ *
+ * ADVERTENCIA que vem junto com a resolucao melhor: o contador de ciclos e' POR
+ * NUCLEO, e nucleos diferentes tem valores diferentes e nao sincronizados. Se a
+ * thread migrar entre as duas leituras, a diferenca e' lixo, possivelmente
+ * negativo. O `-c` da etapa 6 deixa de ser refinamento e passa a ser requisito.
+ * O programa verifica em que nucleo terminou e reclama se nao for o pedido.
+ *
+ * Um binario por benchmark:  bin8/bsort100, bin8/crc, ...
+ *
+ * Uso:  ./bin8/<nome> [-n EXEC] [-w AQUECIMENTOS] [-c NUCLEO] [--header]
+ *
+ * ---------------------------------------------------------------------------
+ * O que segue abaixo veio da etapa 7 e continua valendo.
+ * ---------------------------------------------------------------------------
+ *
  * etapa7.cpp — de ticks para tempo, de tempo para ciclos, e uma linha de CSV.
  *
  * A etapa 6 entregou medicoes reprodutiveis. Falta responder a pergunta que o
@@ -53,6 +90,8 @@
 #include <cstring>
 #include <cerrno>
 #include <cmath>
+#include <csignal>
+#include <csetjmp>
 #include <algorithm>
 
 #include <sched.h>
@@ -215,6 +254,122 @@ static inline uint64_t ler_cntfrq()
 static inline void barreira()
 {
 	asm volatile("" : : : "memory");
+}
+
+/* ================================================================== */
+/* O CONTADOR DE CICLOS, E COMO DESCOBRIR SE ELE ESTA' DISPONIVEL     */
+/* ================================================================== */
+/*
+ * Ler os dois contadores de uma vez, com UMA barreira so'.
+ *
+ * Poderiam ser duas funcoes chamadas em sequencia, mas cada `isb` custa dezenas
+ * de ciclos, e duas barreiras separariam as leituras no tempo. Aqui um unico
+ * isb serializa, e as duas instrucoes `mrs` saem coladas. O desalinhamento entre
+ * o que cada contador registra fica reduzido a uma instrucao.
+ *
+ * Repare nos dois operandos de saida: %0 e %1, listados na ordem em que
+ * aparecem depois dos dois pontos. O compilador escolhe dois registradores
+ * livres e substitui os dois marcadores.
+ */
+static inline void ler_ambos(uint64_t *ticks, uint64_t *ciclos)
+{
+	asm volatile("isb\n\t"
+		     "mrs %0, cntvct_el0\n\t"
+		     "mrs %1, pmccntr_el0"
+		     : "=r"(*ticks), "=r"(*ciclos)
+		     :
+		     : "memory");
+}
+
+/*
+ * Descobrir se o modulo esta' carregado, sem morrer no processo.
+ *
+ * Sem a autorizacao do PMUSERENR_EL0, a instrucao `mrs x0, pmccntr_el0` nao le'
+ * lixo nem devolve zero: ela dispara uma excecao de instrucao ilegal, que o
+ * Linux entrega ao processo como o sinal SIGILL. O padrao para SIGILL e'
+ * terminar o programa. Rodar sem o modulo daria "Illegal instruction" e nada
+ * mais.
+ *
+ * A saida e' instalar um TRATADOR para o sinal e usar sigsetjmp/siglongjmp:
+ *
+ *   sigsetjmp   grava o estado atual (registradores, pilha, mascara de sinais)
+ *               e devolve 0 na primeira passagem
+ *   siglongjmp  volta para aquele ponto de dentro do tratador, e faz o
+ *               sigsetjmp devolver o valor passado, desta vez diferente de zero
+ *
+ * E' a unica forma limpa de continuar depois de um SIGILL, porque retornar
+ * normalmente do tratador reexecutaria a mesma instrucao ilegal, num laco
+ * infinito. O `1` no segundo argumento do sigsetjmp pede que a mascara de
+ * sinais seja salva e restaurada, sem o que SIGILL ficaria bloqueado depois do
+ * salto, ja' que o kernel o bloqueia enquanto o tratador roda.
+ */
+
+static sigjmp_buf ponto_de_retorno;
+
+static void tratador_sigill(int)
+{
+	siglongjmp(ponto_de_retorno, 1);
+}
+
+static bool pmu_acessivel()
+{
+	struct sigaction nova, antiga;
+
+	memset(&nova, 0, sizeof(nova));
+	nova.sa_handler = tratador_sigill;
+	sigemptyset(&nova.sa_mask);
+
+	if (sigaction(SIGILL, &nova, &antiga) != 0)
+		return false;
+
+	bool ok = true;
+
+	if (sigsetjmp(ponto_de_retorno, 1) == 0) {
+		uint64_t v;
+
+		asm volatile("mrs %0, pmccntr_el0" : "=r"(v));
+		barreira();
+	} else {
+		ok = false;      /* chegamos aqui vindos do tratador */
+	}
+
+	sigaction(SIGILL, &antiga, nullptr);
+	return ok;
+}
+
+/*
+ * Acessivel nao e' o mesmo que funcionando. Se PMCR_EL0.E estiver desligado, ou
+ * se o bit do contador de ciclos nao tiver sido habilitado em PMCNTENSET_EL0, a
+ * leitura e' permitida e devolve sempre o mesmo valor. Duas leituras com
+ * trabalho no meio detectam isso.
+ */
+static bool pmu_contando()
+{
+	uint64_t t, a, b;
+	volatile uint64_t lixo = 0;
+
+	ler_ambos(&t, &a);
+	for (int i = 0; i < 10000; i++)
+		lixo += (uint64_t)i;
+	ler_ambos(&t, &b);
+
+	(void)lixo;
+	return b > a;
+}
+
+static uint64_t medir_piso_pmu()
+{
+	uint64_t menor = UINT64_MAX;
+
+	for (int i = 0; i < 1000; i++) {
+		uint64_t t1, t2, c1, c2;
+
+		ler_ambos(&t1, &c1);
+		ler_ambos(&t2, &c2);
+		if (c2 - c1 < menor)
+			menor = c2 - c1;
+	}
+	return menor;
 }
 
 /* ================================================================== */
@@ -512,7 +667,10 @@ static const char *CSV_CABECALHO =
 	"min_us,mediana_us,media_us,max_us,"
 	"media_ciclos,mediana_ciclos,max_ciclos,"
 	"resolucao_rel_pct,dispersao_pct,max_confiavel,"
-	"piso_ticks,piso_pct_mediana,incerteza_media_pct";
+	"piso_ticks,piso_pct_mediana,incerteza_media_pct,"
+	/* acrescentado na etapa 8, sempre no fim */
+	"pmu_ok,min_pmucyc,mediana_pmucyc,media_pmucyc,max_pmucyc,"
+	"piso_pmucyc,razao_medido_derivado,resolucao_pmu_pct,dispersao_pmu_pct";
 
 int main(int argc, char **argv)
 {
@@ -560,22 +718,53 @@ int main(int argc, char **argv)
 
 	mapear_endereco_fixo();
 
+	/* ---- o contador de ciclos esta' disponivel? ---- */
+	bool pmu_ok = pmu_acessivel();
+
+	if (pmu_ok && !pmu_contando()) {
+		fprintf(stderr,
+			"[%s] aviso: PMCCNTR_EL0 e' legivel mas nao avanca. O modulo\n"
+			"      autorizou o acesso mas o contador esta' parado (PMCR_EL0.E\n"
+			"      ou PMCNTENSET_EL0). Recarregue: cd etapa8_pmu && make unload"
+			" load\n", BENCH_NAME);
+		pmu_ok = false;
+	}
+	if (!pmu_ok)
+		fprintf(stderr,
+			"[%s] aviso: PMCCNTR_EL0 inacessivel (SIGILL). O modulo de kernel\n"
+			"      nao esta' carregado. Sem ele esta etapa reporta apenas as\n"
+			"      colunas da etapa 7, derivadas do generic timer.\n"
+			"      Para carregar:  cd etapa8_pmu && make load\n", BENCH_NAME);
+
 	uint64_t piso = medir_piso();
+	uint64_t piso_pmu = pmu_ok ? medir_piso_pmu() : 0;
 
 	uint64_t *amostras = new uint64_t[n];
+	uint64_t *ciclos_medidos = new uint64_t[n];
 
 	for (int i = 0; i < aquecimentos; i++) {
 		bench_entry();
 		barreira();
 	}
 
+	/* Os dois contadores na mesma janela. Quando o PMU nao esta' disponivel
+	 * caimos na leitura simples da etapa 7, para o programa continuar util. */
 	for (int i = 0; i < n; i++) {
-		uint64_t t0 = ler_contador();
-		bench_entry();
-		uint64_t t1 = ler_contador();
+		uint64_t t0, t1, c0 = 0, c1 = 0;
+
+		if (pmu_ok) {
+			ler_ambos(&t0, &c0);
+			bench_entry();
+			ler_ambos(&t1, &c1);
+		} else {
+			t0 = ler_contador();
+			bench_entry();
+			t1 = ler_contador();
+		}
 
 		barreira();
 		amostras[i] = t1 - t0;
+		ciclos_medidos[i] = c1 - c0;
 	}
 
 	uint64_t f_depois = freq_nucleo_hz(nucleo);
@@ -596,6 +785,27 @@ int main(int argc, char **argv)
 	double mediana  = (n % 2)
 		? (double)ordenadas[n / 2]
 		: ((double)ordenadas[n / 2 - 1] + (double)ordenadas[n / 2]) / 2.0;
+
+	/* As mesmas quatro estatisticas sobre os ciclos medidos. */
+	uint64_t *ord_pmu = new uint64_t[n];
+	double media_pmu = 0.0, mediana_pmu = 0.0;
+	uint64_t min_pmu = 0, max_pmu = 0;
+
+	if (pmu_ok) {
+		std::copy(ciclos_medidos, ciclos_medidos + n, ord_pmu);
+		std::sort(ord_pmu, ord_pmu + n);
+
+		double soma_pmu = 0.0;
+		for (int i = 0; i < n; i++)
+			soma_pmu += (double)ord_pmu[i];
+
+		media_pmu   = soma_pmu / n;
+		min_pmu     = ord_pmu[0];
+		max_pmu     = ord_pmu[n - 1];
+		mediana_pmu = (n % 2)
+			? (double)ord_pmu[n / 2]
+			: ((double)ord_pmu[n / 2 - 1] + (double)ord_pmu[n / 2]) / 2.0;
+	}
 
 	/* ================================================================ */
 	/* AS DUAS CONVERSOES                                               */
@@ -671,16 +881,34 @@ int main(int argc, char **argv)
 	else
 		printf(",,,");        /* vazio, e nao zero */
 
-	printf("%.2f,%.1f,%d,%llu,%.1f,%.3f\n",
+	printf("%.2f,%.1f,%d,%llu,%.1f,%.3f,",
 	       res_rel, dispersao, max_confiavel ? 1 : 0,
 	       (unsigned long long)piso, piso_pct, incerteza_media);
+
+	/* A razao entre o que a PMU contou e o que a etapa 7 calculava a partir dos
+	 * ticks. Se der 1,00 a conversao derivada estava correta; qualquer desvio
+	 * mede exatamente por quanto ela errava. */
+	double ciclos_derivados = clock_estavel ? mediana * ciclos_por_tick : 0.0;
+	double razao = (ciclos_derivados > 0.0 && mediana_pmu > 0.0)
+		? mediana_pmu / ciclos_derivados : 0.0;
+
+	if (pmu_ok)
+		printf("1,%llu,%.1f,%.1f,%llu,%llu,%.4f,%.4f,%.1f\n",
+		       (unsigned long long)min_pmu, mediana_pmu, media_pmu,
+		       (unsigned long long)max_pmu, (unsigned long long)piso_pmu,
+		       razao,
+		       mediana_pmu > 0 ? 100.0 / mediana_pmu : 0.0,
+		       mediana_pmu > 0
+			       ? 100.0 * (double)(max_pmu - min_pmu) / mediana_pmu : 0.0);
+	else
+		printf("0,,,,,,,,\n");   /* vazio, e nao zero */
 	fflush(stdout);
 
 	/* ================================================================ */
 	/* CANAL 2: stderr, o relatorio legivel                             */
 	/* ================================================================ */
 
-	fprintf(stderr, "etapa7 — benchmark \"%s\"\n", BENCH_NAME);
+	fprintf(stderr, "etapa8 — benchmark \"%s\"\n", BENCH_NAME);
 	fprintf(stderr, "  %d execucoes medidas, %d de aquecimento\n",
 		n, aquecimentos);
 	fprintf(stderr, "  CNTFRQ_EL0 = %.3f MHz (%.2f ns/tick)\n\n",
@@ -700,6 +928,9 @@ int main(int argc, char **argv)
 	fprintf(stderr, "  clock       %.0f MHz antes, %.0f MHz depois   %s\n",
 		f_antes / 1e6, f_depois / 1e6,
 		clock_estavel ? "estavel" : "<<< MUDOU");
+	fprintf(stderr, "  PMCCNTR_EL0 %s\n",
+		pmu_ok ? "acessivel e contando"
+		       : "<<< INDISPONIVEL (modulo de kernel nao carregado)");
 
 	if (!ok_fifo || !ok_mlock)
 		fprintf(stderr,
@@ -749,6 +980,53 @@ int main(int argc, char **argv)
 	else
 		fprintf(stderr, "(indisponivel)\n");
 	fprintf(stderr, "\n");
+
+	/* ---- o confronto entre os dois instrumentos ---- */
+	if (pmu_ok) {
+		fprintf(stderr,
+			"CICLOS MEDIDOS (PMCCNTR_EL0)   contra   CICLOS DERIVADOS (etapa 7)\n");
+		fprintf(stderr, "  minimo   %12llu\n", (unsigned long long)min_pmu);
+		fprintf(stderr, "  mediana  %12.1f", mediana_pmu);
+		if (clock_estavel)
+			fprintf(stderr, "        derivado %12.0f     razao %.4f\n",
+				ciclos_derivados,
+				ciclos_derivados > 0 ? mediana_pmu / ciclos_derivados : 0.0);
+		else
+			fprintf(stderr, "        derivado indisponivel\n");
+		fprintf(stderr, "  MEDIA    %12.1f\n", media_pmu);
+		fprintf(stderr, "  maximo   %12llu\n", (unsigned long long)max_pmu);
+		fprintf(stderr, "  piso do instrumento  %llu ciclos = %.2f %% da mediana\n",
+			(unsigned long long)piso_pmu,
+			mediana_pmu > 0 ? 100.0 * (double)piso_pmu / mediana_pmu : 0.0);
+		fprintf(stderr,
+			"  resolucao  %.4f %% por amostra   (era %.2f %% com o generic timer,\n"
+			"             ou seja %.0fx melhor)\n",
+			mediana_pmu > 0 ? 100.0 / mediana_pmu : 0.0, res_rel,
+			mediana_pmu > 0 && res_rel > 0
+				? res_rel / (100.0 / mediana_pmu) : 0.0);
+		fprintf(stderr, "  dispersao  %.1f %%   (era %.1f %%)\n",
+			mediana_pmu > 0
+				? 100.0 * (double)(max_pmu - min_pmu) / mediana_pmu : 0.0,
+			dispersao);
+
+		/* A razao e' o veredito sobre a etapa 7 inteira. */
+		if (clock_estavel && ciclos_derivados > 0.0) {
+			double r = mediana_pmu / ciclos_derivados;
+
+			if (r > 0.98 && r < 1.02)
+				fprintf(stderr,
+					"\n  A conversao derivada da etapa 7 CONFERE (razao %.4f).\n"
+					"  ticks x f_nucleo / f_timer recuperava o numero certo.\n", r);
+			else
+				fprintf(stderr,
+					"\n  A conversao derivada da etapa 7 ERRAVA %.1f %% "
+					"(razao %.4f).\n"
+					"  A frequencia lida do sysfs nao descreve o que o nucleo\n"
+					"  realmente fez durante a medicao.\n",
+					(r - 1.0) * 100.0, r);
+		}
+		fprintf(stderr, "\n");
+	}
 
 	fprintf(stderr, "CONVERSAO\n");
 	fprintf(stderr, "  ticks -> us       exata:    /%.3f MHz\n", f_timer / 1e6);
@@ -814,6 +1092,18 @@ int main(int argc, char **argv)
 	fprintf(stderr, "\n  max_confiavel = %d  (clock estavel, isolamento "
 			"completo, mediana >= 100 ticks)\n", max_confiavel ? 1 : 0);
 
+	/* O contador de ciclos e' POR NUCLEO e nucleos diferentes nao estao
+	 * sincronizados. Uma migracao no meio do lote corrompe todas as diferencas,
+	 * possivelmente produzindo valores negativos que aparecem como numeros
+	 * gigantes por serem sem sinal. */
+	if (pmu_ok && nucleo_real != nucleo)
+		fprintf(stderr,
+			"\n  ALERTA: a thread terminou no nucleo %d e nao no %d pedido.\n"
+			"    O PMCCNTR_EL0 e' por nucleo e os valores nao sao comparaveis\n"
+			"    entre nucleos. Descarte este lote.\n", nucleo_real, nucleo);
+
+	delete[] ord_pmu;
+	delete[] ciclos_medidos;
 	delete[] ordenadas;
 	delete[] amostras;
 	return 0;

@@ -111,13 +111,15 @@ HDEFS_bsort100 := -DMAPEAR_ENDERECO_FIXO
 BINS5 := $(addprefix bin5/,$(BENCHES))
 BINS6 := $(addprefix bin6/,$(BENCHES))
 BINS7 := $(addprefix bin7/,$(BENCHES))
+BINS8 := $(addprefix bin8/,$(BENCHES))
 
-.PHONY: etapa5 etapa6 etapa7
+.PHONY: etapa5 etapa6 etapa7 etapa8
 etapa5: $(BINS5)
 etapa6: $(BINS6)
 etapa7: $(BINS7)
+etapa8: $(BINS8)
 
-bin5 bin6 bin7 obj:
+bin5 bin6 bin7 bin8 obj:
 	@mkdir -p $@
 
 # O objeto da fonte Malardalen e' o mesmo para as duas etapas: quem muda e' o
@@ -134,10 +136,14 @@ obj/arn6_%.o: etapa6.cpp | obj
 obj/arn7_%.o: etapa7.cpp | obj
 	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
 
+obj/arn8_%.o: etapa8.cpp | obj
+	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
+
 .SECONDARY: $(addprefix obj/,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn5_,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn6_,$(addsuffix .o,$(BENCHES))) \
-            $(addprefix obj/arn7_,$(addsuffix .o,$(BENCHES)))
+            $(addprefix obj/arn7_,$(addsuffix .o,$(BENCHES))) \
+            $(addprefix obj/arn8_,$(addsuffix .o,$(BENCHES)))
 
 bin5/%: obj/%.o obj/arn5_%.o | bin5
 	$(CXX) -o $@ $^ -lm
@@ -146,6 +152,9 @@ bin6/%: obj/%.o obj/arn6_%.o | bin6
 	$(CXX) -o $@ $^ -lm
 
 bin7/%: obj/%.o obj/arn7_%.o | bin7
+	$(CXX) -o $@ $^ -lm
+
+bin8/%: obj/%.o obj/arn8_%.o | bin8
 	$(CXX) -o $@ $^ -lm
 
 # ---------------------------------------------------------------------------
@@ -169,6 +178,24 @@ medir: $(BINS7)
 	@echo "==> $(CSV)"
 	@column -s, -t $(CSV) 2>/dev/null || cat $(CSV)
 
+# A mesma bateria com o contador de ciclos real. Exige o modulo carregado:
+#
+#   cd etapa8_pmu && make load && cd ..
+#   sudo make medir8 N=100 W=5
+#   cd etapa8_pmu && make unload
+#
+# Sem o modulo os binarios ainda rodam, avisam, e preenchem so' as colunas da
+# etapa 7.
+CSV8 ?= resultados_pmu.csv
+
+.PHONY: medir8
+medir8: $(BINS8)
+	@./bin8/$(firstword $(BENCHES)) --header > $(CSV8)
+	@for b in $(BENCHES); do ./bin8/$$b -n $(N) -w $(W) >> $(CSV8); done
+	@echo
+	@echo "==> $(CSV8)"
+	@column -s, -t $(CSV8) 2>/dev/null || cat $(CSV8)
+
 clean:
-	rm -f $(ETAPAS) $(CSV)
-	rm -rf bin bin5 bin6 bin7 obj
+	rm -f $(ETAPAS) $(CSV) $(CSV8)
+	rm -rf bin bin5 bin6 bin7 bin8 obj
