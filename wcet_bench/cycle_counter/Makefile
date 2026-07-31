@@ -108,26 +108,37 @@ DEFS_matmult  := -DUPPSALAWCET
 #                         pagina antes de rodar. Ver o comentario em etapa5.cpp.
 HDEFS_bsort100 := -DMAPEAR_ENDERECO_FIXO
 
-BINS := $(addprefix bin/,$(BENCHES))
+BINS5 := $(addprefix bin5/,$(BENCHES))
+BINS6 := $(addprefix bin6/,$(BENCHES))
 
-.PHONY: etapa5
-etapa5: $(BINS)
+.PHONY: etapa5 etapa6
+etapa5: $(BINS5)
+etapa6: $(BINS6)
 
-bin obj:
+bin5 bin6 obj:
 	@mkdir -p $@
 
+# O objeto da fonte Malardalen e' o mesmo para as duas etapas: quem muda e' o
+# harness linkado junto.
 obj/%.o: $(SRCDIR)/%.c | obj
 	$(CC) $(BENCH_CFLAGS) $(DEFS_$*) -c -o $@ $<
 
-obj/arn_%.o: etapa5.cpp | obj
+obj/arn5_%.o: etapa5.cpp | obj
+	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
+
+obj/arn6_%.o: etapa6.cpp | obj
 	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
 
 .SECONDARY: $(addprefix obj/,$(addsuffix .o,$(BENCHES))) \
-            $(addprefix obj/arn_,$(addsuffix .o,$(BENCHES)))
+            $(addprefix obj/arn5_,$(addsuffix .o,$(BENCHES))) \
+            $(addprefix obj/arn6_,$(addsuffix .o,$(BENCHES)))
 
-bin/%: obj/%.o obj/arn_%.o | bin
+bin5/%: obj/%.o obj/arn5_%.o | bin5
+	$(CXX) -o $@ $^ -lm
+
+bin6/%: obj/%.o obj/arn6_%.o | bin6
 	$(CXX) -o $@ $^ -lm
 
 clean:
 	rm -f $(ETAPAS)
-	rm -rf bin obj
+	rm -rf bin bin5 bin6 obj
