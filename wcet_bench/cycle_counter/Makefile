@@ -29,7 +29,7 @@ CXX      ?= g++
 # Ate' la', o compilador faz o que o codigo-fonte manda, e nada mais.
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O0 -g
 
-ETAPAS := etapa1 etapa2
+ETAPAS := etapa1 etapa2 etapa3 etapa3-O2
 
 .PHONY: all clean
 all: $(ETAPAS)
@@ -39,6 +39,15 @@ etapa1: etapa1.cpp
 
 etapa2: etapa2.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
+
+# A etapa 3 e' o unico ponto do tutorial com duas versoes do mesmo fonte.
+# O defeito 3 (o compilador apagar o codigo medido) so' existe com otimizacao
+# ligada, entao voce precisa das duas para ver o antes e o depois.
+etapa3: etapa3.cpp
+	$(CXX) $(CXXFLAGS) -DNIVEL_OPT='"-O0"' -o $@ $<
+
+etapa3-O2: etapa3.cpp
+	$(CXX) -std=c++17 -Wall -Wextra -O2 -g -DNIVEL_OPT='"-O2"' -o $@ $<
 
 clean:
 	rm -f $(ETAPAS)
