@@ -53,6 +53,9 @@ example_eval: $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp team_manager.hpp
 example_bin_packing: $(EXAMPLES_DIR)/example_bin_packing.cpp parser_json.cpp dag.cpp allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -o $@ $(EXAMPLES_DIR)/example_bin_packing.cpp parser_json.cpp dag.cpp
 
+show_alloc: $(EXAMPLES_DIR)/show_alloc.cpp parser_json.cpp dag.cpp allocator.hpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -o $@ $(EXAMPLES_DIR)/show_alloc.cpp parser_json.cpp dag.cpp
+
 example_saturation: $(EXAMPLES_DIR)/example_saturation.cpp allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -o $@ $(EXAMPLES_DIR)/example_saturation.cpp
 
@@ -120,7 +123,7 @@ clean:
 	      example_ring example_eventfd example_two_threads example_dispatcher \
 	      example_epoll example_pipeline example_team_manager example_full_pipeline \
 	      example_from_plan example_eval example_bin_packing \
-	      example_saturation example_heuristic_eval \
+	      example_saturation example_heuristic_eval show_alloc \
 	      codegen
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 
