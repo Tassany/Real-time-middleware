@@ -803,7 +803,11 @@ static const char *CSV_CABECALHO =
 	/* acrescentado na etapa 8, sempre no fim */
 	"pmu_ok,min_pmucyc,mediana_pmucyc,media_pmucyc,max_pmucyc,"
 	"piso_pmucyc,razao_medido_derivado,resolucao_pmu_pct,dispersao_pmu_pct,"
-	"fonte_ciclos";
+	"fonte_ciclos,"
+	/* As duas colunas que interessam para reportar: mediana de ciclos com o
+	 * piso do instrumento descontado, medida e derivada. A coluna
+	 * razao_medido_derivado e' a razao ENTRE ESTAS DUAS, e nao entre as brutas. */
+	"mediana_pmucyc_liq,mediana_ciclos_liq";
 
 int main(int argc, char **argv)
 {
@@ -1069,24 +1073,41 @@ int main(int argc, char **argv)
 	       res_rel, dispersao, max_confiavel ? 1 : 0,
 	       (unsigned long long)piso, piso_pct, incerteza_media);
 
-	/* A razao entre o que a PMU contou e o que a etapa 7 calculava a partir dos
-	 * ticks. Se der 1,00 a conversao derivada estava correta; qualquer desvio
-	 * mede exatamente por quanto ela errava. */
+	/*
+	 * A razao entre o que a PMU contou e o que a etapa 7 calculava a partir dos
+	 * ticks. Ela so' faz sentido DEPOIS de descontar o piso de cada instrumento,
+	 * e ignorar isso produz uma conclusao errada.
+	 *
+	 * Os dois pisos sao diferentes, e por muito. O da janela de ticks e' de
+	 * 1 tick, ou cerca de 44 ciclos. O da janela de ciclos e' de cerca de 180
+	 * ciclos, porque no caminho `perf` ela envolve a janela de ticks por fora e
+	 * portanto engole as duas leituras de contador com seus `isb`.
+	 *
+	 * Comparar os valores brutos e' comparar duas medidas do mesmo programa com
+	 * ~136 ciclos de instrumento a mais de um lado. Num benchmark de 115 mil
+	 * ciclos isso some. Num de 500 ciclos vira 27 %, e a razao bruta chega a
+	 * 1,27 sem que nada esteja errado com a medicao.
+	 *
+	 * Descontados os dois pisos, o que sobra e' programa contra programa.
+	 */
 	double ciclos_derivados = clock_estavel ? mediana * ciclos_por_tick : 0.0;
-	double razao = (ciclos_derivados > 0.0 && mediana_pmu > 0.0)
-		? mediana_pmu / ciclos_derivados : 0.0;
+	double medido_liq  = mediana_pmu - (double)piso_pmu;
+	double derivado_liq = clock_estavel
+		? (mediana - (double)piso) * ciclos_por_tick : 0.0;
+	double razao = (derivado_liq > 0.0 && medido_liq > 0.0)
+		? medido_liq / derivado_liq : 0.0;
 
 	if (pmu_ok)
-		printf("1,%llu,%.1f,%.1f,%llu,%llu,%.4f,%.4f,%.1f,%s\n",
+		printf("1,%llu,%.1f,%.1f,%llu,%llu,%.4f,%.4f,%.1f,%s,%.0f,%.0f\n",
 		       (unsigned long long)min_pmu, mediana_pmu, media_pmu,
 		       (unsigned long long)max_pmu, (unsigned long long)piso_pmu,
 		       razao,
 		       mediana_pmu > 0 ? 100.0 / mediana_pmu : 0.0,
 		       mediana_pmu > 0
 			       ? 100.0 * (double)(max_pmu - min_pmu) / mediana_pmu : 0.0,
-		       nome_fonte(fonte));
+		       nome_fonte(fonte), medido_liq, derivado_liq);
 	else
-		printf("0,,,,,,,,,%s\n", nome_fonte(fonte));   /* vazio, e nao zero */
+		printf("0,,,,,,,,,%s,,\n", nome_fonte(fonte));   /* vazio, e nao zero */
 	fflush(stdout);
 
 	/* ================================================================ */
@@ -1175,7 +1196,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "  minimo   %12llu\n", (unsigned long long)min_pmu);
 		fprintf(stderr, "  mediana  %12.1f", mediana_pmu);
 		if (clock_estavel)
-			fprintf(stderr, "        derivado %12.0f     razao %.4f\n",
+			fprintf(stderr, "        derivado %12.0f     razao bruta %.4f\n",
 				ciclos_derivados,
 				ciclos_derivados > 0 ? mediana_pmu / ciclos_derivados : 0.0);
 		else
@@ -1185,6 +1206,18 @@ int main(int argc, char **argv)
 		fprintf(stderr, "  piso do instrumento  %llu ciclos = %.2f %% da mediana\n",
 			(unsigned long long)piso_pmu,
 			mediana_pmu > 0 ? 100.0 * (double)piso_pmu / mediana_pmu : 0.0);
+
+		/* Os dois valores que devem ir para o relatorio: cada um com o piso do
+		 * SEU proprio instrumento descontado. Sao estes que se comparam. */
+		if (clock_estavel)
+			fprintf(stderr,
+				"\n  DESCONTADO O PISO DE CADA INSTRUMENTO\n"
+				"    medido  %12.0f ciclos   (%.0f - %llu)\n"
+				"    derivado%12.0f ciclos   ((%.1f - %llu) x %.4f)\n"
+				"    razao   %12.4f\n",
+				medido_liq, mediana_pmu, (unsigned long long)piso_pmu,
+				derivado_liq, mediana, (unsigned long long)piso, ciclos_por_tick,
+				razao);
 		fprintf(stderr,
 			"  resolucao  %.4f %% por amostra   (era %.2f %% com o generic timer,\n"
 			"             ou seja %.0fx melhor)\n",
