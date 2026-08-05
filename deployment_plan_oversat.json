@@ -2182,41 +2182,6 @@
           "wcet_ns": 821
         }
       ]
-    },
-    {
-      "id": 63,
-      "subtasks": [
-        {
-          "id": 187,
-          "component_type": "source",
-          "priority": 40,
-          "period_ns": 12000000,
-          "deadline_ns": 12000000,
-          "output_type": "double",
-          "config": {},
-          "wcet_ns": 48050
-        },
-        {
-          "id": 188,
-          "component_type": "intermediate",
-          "priority": 40,
-          "period_ns": 12000000,
-          "deadline_ns": 12000000,
-          "output_type": "double",
-          "config": {},
-          "wcet_ns": 30310
-        },
-        {
-          "id": 189,
-          "component_type": "sink",
-          "priority": 40,
-          "period_ns": 12000000,
-          "deadline_ns": 12000000,
-          "output_type": "void",
-          "config": {},
-          "wcet_ns": 821
-        }
-      ]
     }
   ],
   "connections": [
