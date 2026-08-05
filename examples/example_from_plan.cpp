@@ -4,7 +4,7 @@
  * Reads a deployment plan JSON and executes the pipeline dynamically,
  * without code generation (Phase 6 pending).
  *
- * Usage: ./example_from_plan <deployment_plan.json>
+ * Usage: ./example_from_plan <deployment_plan.json> [hyperperiods]
  *
  * Generic component semantics (demo):
  *   source       — increments a per-subtask counter
@@ -12,7 +12,7 @@
  *   sink         — prints its predecessor's value
  *
  * The main thread fires source subtasks at their declared period_ns for
- * 4 × LCM(all source periods).
+ * hyperperiods × LCM(all source periods), defaulting to 4.
  */
 
 #include <iostream>
@@ -21,6 +21,8 @@
 #include <thread>
 #include <chrono>
 #include <algorithm>
+#include <cstdint>
+#include <cstdlib>
 #include <numeric>
 #include <map>
 #include <memory>
@@ -30,9 +32,14 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <deployment_plan.json>\n";
+        std::cerr << "Usage: " << argv[0] << " <deployment_plan.json> [hyperperiods]\n"
+                  << "  hyperperiods: number of hyperperiods to simulate (default 4)\n";
         return 1;
     }
+
+    // Number of hyperperiods to simulate; more => more ticks (longer run).
+    uint64_t hyperperiods = (argc > 2) ? std::strtoull(argv[2], nullptr, 10) : 4;
+    if (hyperperiods == 0) hyperperiods = 4;
 
     // -----------------------------------------------------------------------
     //  1. Parse deployment plan
@@ -145,10 +152,11 @@ int main(int argc, char* argv[]) {
     for (std::size_t i = 1; i < sources.size(); ++i)
         lcm_p = std::lcm(lcm_p, sources[i].second);
 
-    int ticks = static_cast<int>(4 * lcm_p / min_p);
+    const uint64_t ticks = hyperperiods * lcm_p / min_p;
 
     std::cout << "Tick = "    << min_p / 1'000'000ULL << " ms"
               << "  LCM = "   << lcm_p / 1'000'000ULL << " ms"
+              << "  Hyperperiods = " << hyperperiods
               << "  Running " << ticks << " ticks ("
               << ticks * min_p / 1'000'000ULL << " ms)...\n";
 
@@ -157,10 +165,10 @@ int main(int argc, char* argv[]) {
     // -----------------------------------------------------------------------
     tm.start();
 
-    for (int tick = 1; tick <= ticks; ++tick) {
+    for (uint64_t tick = 1; tick <= ticks; ++tick) {
         std::this_thread::sleep_for(std::chrono::nanoseconds(min_p));
         for (auto& [id, p] : sources)
-            if (static_cast<uint64_t>(tick) % (p / min_p) == 0)
+            if (tick % (p / min_p) == 0)
                 tm.notify(id);
     }
 
