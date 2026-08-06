@@ -6,7 +6,7 @@
     }
   ],
   "allocation": {
-    "strategy": "best_fit",
+    "strategy": "first_fit",
     "sort_by": "none",
     "weight": "utilization",
     "num_cores": 3,
