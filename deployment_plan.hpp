@@ -30,6 +30,8 @@ struct SubtaskInfo {
     uint64_t    period_ns;
     uint64_t    deadline_ns;
     uint64_t    wcet_ns = 0;    // worst-case execution time; 0 = not set
+    std::string benchmark;      // wcet_bench entry point to run as the subtask
+                                // body; empty = demo semantics (see bench_registry.hpp)
     json        config;
 };
 

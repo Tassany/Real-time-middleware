@@ -35,10 +35,13 @@
 #include <map>
 #include <memory>
 #include <fstream>
+#include <set>
+#include <stdexcept>
 #include <vector>
 #include <cstdlib>
 #include "team_manager.hpp"
 #include "parser_json.hpp"
+#include "bench_registry.hpp"
 
 // ---------------------------------------------------------------------------
 //  Per-subtask metrics
@@ -180,14 +183,26 @@ int main(int argc, char* argv[]) {
             Subtask*  s = subtask_ptrs.at(id).get();
             auto&     m = mmap.at(id);
 
+            // Real subtask body, when the plan names one. Resolved here so the
+            // lambda captures a plain function pointer and does no map lookup
+            // inside the real-time loop.
+            bench::entry_fn body = info.benchmark.empty()
+                                 ? nullptr
+                                 : bench::lookup(info.benchmark);
+            if (!info.benchmark.empty() && !body)
+                throw std::runtime_error("subtask " + std::to_string(id) +
+                    ": unknown benchmark '" + info.benchmark +
+                    "' (expected " + bench::known_names() + ")");
+
             if (info.component_type == "source") {
                 uint64_t dl = info.deadline_ns;
 
-                s->execute = [v, id, s, &m, dl] {
+                s->execute = [v, id, s, &m, dl, body] {
                     uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     v[id].store(v[id].load(std::memory_order_relaxed) + 1.0,
                                 std::memory_order_relaxed);
+                    if (body) body();
 
                     if (s->period_ns > 0) {
                         int64_t t_sched = static_cast<int64_t>(
@@ -203,11 +218,12 @@ int main(int argc, char* argv[]) {
                 int      pred = preds.at(id)[0];
                 uint64_t dl   = info.deadline_ns;
 
-                s->execute = [v, id, pred, s, &m, dl] {
+                s->execute = [v, id, pred, s, &m, dl, body] {
                     uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     v[id].store(v[pred].load(std::memory_order_relaxed) * 2.0,
                                 std::memory_order_relaxed);
+                    if (body) body();
 
                     if (s->period_ns > 0) {
                         int64_t t_sched = static_cast<int64_t>(
@@ -223,10 +239,11 @@ int main(int argc, char* argv[]) {
                 int      pred = preds.at(id)[0];
                 uint64_t dl   = info.deadline_ns;
 
-                s->execute = [v, pred, s, &m, dl] {
+                s->execute = [v, pred, s, &m, dl, body] {
                     uint64_t t_actual = Dispatcher::monotonic_ns();
 
                     (void)v[pred].load(std::memory_order_relaxed);
+                    if (body) body();
 
                     if (s->period_ns > 0) {
                         int64_t t_sched = static_cast<int64_t>(
@@ -271,6 +288,29 @@ int main(int argc, char* argv[]) {
               << "  Ticks: "       << ticks
               << "  (" << ticks * min_p / 1'000'000ULL << " ms)\n"
               << "Collecting metrics (no output during run)...\n\n";
+
+    // -----------------------------------------------------------------------
+    //  8b. Warm up the benchmarks named by the plan
+    //
+    //  Outside the real-time loop, so the bsort100 page mapping and the crc
+    //  static table are paid for before the first job rather than by it.
+    // -----------------------------------------------------------------------
+    {
+        std::set<std::string> names;
+        for (auto& task : plan.tasks)
+            for (auto& st : task.subtasks)
+                if (!st.benchmark.empty()) names.insert(st.benchmark);
+
+        if (!names.empty()) {
+            std::cout << "Warming up " << names.size() << " benchmark(s), "
+                      << bench::WARMUP_RUNS << " runs each:";
+            for (const auto& n : names) {
+                bench::prepare(n);
+                std::cout << " " << n;
+            }
+            std::cout << "\n\n";
+        }
+    }
 
     // -----------------------------------------------------------------------
     //  9. Run

@@ -65,6 +65,7 @@ std::vector<SubtaskInfo> JsonParser::parse_subtasks(const json& j) {
         subtask.period_ns   = s.value("period_ns", uint64_t(0));
         subtask.deadline_ns = s.value("deadline_ns", uint64_t(0));
         subtask.wcet_ns     = s.value("wcet_ns", uint64_t(0));
+        subtask.benchmark   = s.value("benchmark", std::string{""});
         subtask.config      = s.value("config", json::object());
         subtasks.push_back(subtask);
     }

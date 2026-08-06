@@ -24,7 +24,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 2,
@@ -34,7 +35,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 3,
@@ -44,7 +46,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -59,7 +62,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 5,
@@ -69,7 +73,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 6,
@@ -79,7 +84,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -94,7 +100,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 8,
@@ -104,7 +111,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 9,
@@ -114,7 +122,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -129,7 +138,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 11,
@@ -139,7 +149,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 12,
@@ -149,7 +160,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -164,7 +176,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 14,
@@ -174,7 +187,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 15,
@@ -184,7 +198,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -199,7 +214,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 17,
@@ -209,7 +225,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 18,
@@ -219,7 +236,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -234,7 +252,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 20,
@@ -244,7 +263,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 21,
@@ -254,7 +274,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -269,7 +290,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 23,
@@ -279,7 +301,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 24,
@@ -289,7 +312,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -304,7 +328,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 26,
@@ -314,7 +339,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 27,
@@ -324,7 +350,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -339,7 +366,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 29,
@@ -349,7 +377,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 30,
@@ -359,7 +388,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -374,7 +404,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 32,
@@ -384,7 +415,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 33,
@@ -394,7 +426,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -409,7 +442,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 35,
@@ -419,7 +453,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 36,
@@ -429,7 +464,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -444,7 +480,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 38,
@@ -454,7 +491,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 39,
@@ -464,7 +502,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -479,7 +518,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 41,
@@ -489,7 +529,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 42,
@@ -499,7 +540,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -514,7 +556,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 44,
@@ -524,7 +567,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 45,
@@ -534,7 +578,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -549,7 +594,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 47,
@@ -559,7 +605,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 48,
@@ -569,7 +616,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -584,7 +632,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 50,
@@ -594,7 +643,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 51,
@@ -604,7 +654,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -619,7 +670,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 53,
@@ -629,7 +681,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 54,
@@ -639,7 +692,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -654,7 +708,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 56,
@@ -664,7 +719,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 57,
@@ -674,7 +730,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -689,7 +746,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 59,
@@ -699,7 +757,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 60,
@@ -709,7 +768,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -724,7 +784,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 62,
@@ -734,7 +795,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 63,
@@ -744,7 +806,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -759,7 +822,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 65,
@@ -769,7 +833,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 66,
@@ -779,7 +844,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -794,7 +860,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 68,
@@ -804,7 +871,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 69,
@@ -814,7 +882,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -829,7 +898,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 71,
@@ -839,7 +909,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 72,
@@ -849,7 +920,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -864,7 +936,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 74,
@@ -874,7 +947,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 75,
@@ -884,7 +958,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -899,7 +974,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 77,
@@ -909,7 +985,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 78,
@@ -919,7 +996,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -934,7 +1012,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 789
+          "wcet_ns": 789,
+          "benchmark": "ud"
         },
         {
           "id": 80,
@@ -944,7 +1023,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 746
+          "wcet_ns": 746,
+          "benchmark": "fft1"
         },
         {
           "id": 81,
@@ -954,7 +1034,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 207
+          "wcet_ns": 207,
+          "benchmark": "statemate"
         }
       ]
     },
@@ -969,7 +1050,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 789
+          "wcet_ns": 789,
+          "benchmark": "ud"
         },
         {
           "id": 83,
@@ -979,7 +1061,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 746
+          "wcet_ns": 746,
+          "benchmark": "fft1"
         },
         {
           "id": 84,
@@ -989,7 +1072,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 207
+          "wcet_ns": 207,
+          "benchmark": "statemate"
         }
       ]
     },
@@ -1004,7 +1088,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 789
+          "wcet_ns": 789,
+          "benchmark": "ud"
         },
         {
           "id": 86,
@@ -1014,7 +1099,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 746
+          "wcet_ns": 746,
+          "benchmark": "fft1"
         },
         {
           "id": 87,
@@ -1024,7 +1110,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 207
+          "wcet_ns": 207,
+          "benchmark": "statemate"
         }
       ]
     },
@@ -1039,7 +1126,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 789
+          "wcet_ns": 789,
+          "benchmark": "ud"
         },
         {
           "id": 89,
@@ -1049,7 +1137,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 746
+          "wcet_ns": 746,
+          "benchmark": "fft1"
         },
         {
           "id": 90,
@@ -1059,7 +1148,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 207
+          "wcet_ns": 207,
+          "benchmark": "statemate"
         }
       ]
     },
@@ -1074,7 +1164,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 789
+          "wcet_ns": 789,
+          "benchmark": "ud"
         },
         {
           "id": 92,
@@ -1084,7 +1175,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 746
+          "wcet_ns": 746,
+          "benchmark": "fft1"
         },
         {
           "id": 93,
@@ -1094,7 +1186,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 207
+          "wcet_ns": 207,
+          "benchmark": "statemate"
         }
       ]
     },
@@ -1109,7 +1202,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 789
+          "wcet_ns": 789,
+          "benchmark": "ud"
         },
         {
           "id": 95,
@@ -1119,7 +1213,8 @@
           "deadline_ns": 1000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 746
+          "wcet_ns": 746,
+          "benchmark": "fft1"
         },
         {
           "id": 96,
@@ -1129,7 +1224,8 @@
           "deadline_ns": 1000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 207
+          "wcet_ns": 207,
+          "benchmark": "statemate"
         }
       ]
     },
@@ -1144,7 +1240,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 98,
@@ -1154,7 +1251,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 99,
@@ -1164,7 +1262,8 @@
           "deadline_ns": 2000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1179,7 +1278,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 101,
@@ -1189,7 +1289,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 102,
@@ -1199,7 +1300,8 @@
           "deadline_ns": 2000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1214,7 +1316,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 104,
@@ -1224,7 +1327,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 105,
@@ -1234,7 +1338,8 @@
           "deadline_ns": 2000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1249,7 +1354,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 107,
@@ -1259,7 +1365,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 108,
@@ -1269,7 +1376,8 @@
           "deadline_ns": 2000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1284,7 +1392,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 110,
@@ -1294,7 +1403,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 111,
@@ -1304,7 +1414,8 @@
           "deadline_ns": 2000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1319,7 +1430,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 113,
@@ -1329,7 +1441,8 @@
           "deadline_ns": 2000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 114,
@@ -1339,7 +1452,8 @@
           "deadline_ns": 2000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1354,7 +1468,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 116,
@@ -1364,7 +1479,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 117,
@@ -1374,7 +1490,8 @@
           "deadline_ns": 3000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1389,7 +1506,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 119,
@@ -1399,7 +1517,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 120,
@@ -1409,7 +1528,8 @@
           "deadline_ns": 3000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1424,7 +1544,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 122,
@@ -1434,7 +1555,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 123,
@@ -1444,7 +1566,8 @@
           "deadline_ns": 3000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1459,7 +1582,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 125,
@@ -1469,7 +1593,8 @@
           "deadline_ns": 3000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 126,
@@ -1479,7 +1604,8 @@
           "deadline_ns": 3000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1494,7 +1620,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 128,
@@ -1504,7 +1631,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 129,
@@ -1514,7 +1642,8 @@
           "deadline_ns": 4000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1529,7 +1658,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 131,
@@ -1539,7 +1669,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 132,
@@ -1549,7 +1680,8 @@
           "deadline_ns": 4000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1564,7 +1696,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 134,
@@ -1574,7 +1707,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 135,
@@ -1584,7 +1718,8 @@
           "deadline_ns": 4000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1599,7 +1734,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 137,
@@ -1609,7 +1745,8 @@
           "deadline_ns": 4000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 138,
@@ -1619,7 +1756,8 @@
           "deadline_ns": 4000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1634,7 +1772,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 140,
@@ -1644,7 +1783,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 141,
@@ -1654,7 +1794,8 @@
           "deadline_ns": 6000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1669,7 +1810,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 143,
@@ -1679,7 +1821,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 144,
@@ -1689,7 +1832,8 @@
           "deadline_ns": 6000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1704,7 +1848,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 146,
@@ -1714,7 +1859,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 147,
@@ -1724,7 +1870,8 @@
           "deadline_ns": 6000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1739,7 +1886,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 149,
@@ -1749,7 +1897,8 @@
           "deadline_ns": 6000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 150,
@@ -1759,7 +1908,8 @@
           "deadline_ns": 6000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1774,7 +1924,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 152,
@@ -1784,7 +1935,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 153,
@@ -1794,7 +1946,8 @@
           "deadline_ns": 12000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1809,7 +1962,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 155,
@@ -1819,7 +1973,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 156,
@@ -1829,7 +1984,8 @@
           "deadline_ns": 12000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1844,7 +2000,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 158,
@@ -1854,7 +2011,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 159,
@@ -1864,7 +2022,8 @@
           "deadline_ns": 12000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     },
@@ -1879,7 +2038,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 48050
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
         },
         {
           "id": 161,
@@ -1889,7 +2049,8 @@
           "deadline_ns": 12000000,
           "output_type": "double",
           "config": {},
-          "wcet_ns": 30310
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
         },
         {
           "id": 162,
@@ -1899,7 +2060,8 @@
           "deadline_ns": 12000000,
           "output_type": "void",
           "config": {},
-          "wcet_ns": 821
+          "wcet_ns": 821,
+          "benchmark": "crc"
         }
       ]
     }
