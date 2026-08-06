@@ -21,14 +21,5 @@ sudo ./example_from_plan deployment_plan.json
 ## Evaluation of the tasks
  sudo ./example_eval deployment_plan.json
 
-
-
-  # 1. Extrai o CFG (gera bs.xml)
-  bash extract.sh bs binary_search MIPS MIPS_bs
-
-  # 2. Calcula o WCET (imprime "WCET: 3889" no final)
-  bash analysis.sh bs binary_search MIPS lp_solve MIPS_bs
-
-  cp /caminho/para/minha_fn.c benchmarks/minha_fn/minha_fn.c
-  bash extract.sh minha_fn nome_da_fn MIPS MIPS_out
-  bash analysis.sh minha_fn nome_da_fn MIPS lp_solve MIPS_out
+## Run plot the results
+python3 plot_latency.py latency_samples.csv
