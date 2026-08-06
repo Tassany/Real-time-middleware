@@ -1,7 +1,35 @@
 CXX      = g++
+CC       = gcc
 CXXFLAGS = -std=c++17 -Wall -Iinclude
 
 EXAMPLES_DIR = examples
+
+# -----------------------------------------------------------------------
+#  Mälardalen benchmarks as subtask bodies
+#
+#  BENCH_CFLAGS reproduces wcet_bench/cycle_counter/RELATORIO.md sec. 2. Every
+#  wcet_ns in the deployment plans was measured with exactly these flags on a
+#  Raspberry Pi 5; changing the -O level invalidates all of them silently.
+#
+#  -Dmain=bench_entry_<name> turns each standalone main() into a callable
+#  function, and objcopy then demotes every other global symbol to local:
+#  bsort100.c and matmult.c both define Seed and Initialize, so linking the six
+#  objects together without this either fails or binds to the wrong one.
+# -----------------------------------------------------------------------
+BENCH_DIR    = wcet_bench
+BENCH_OBJDIR = $(BENCH_DIR)/obj
+BENCH_NAMES  = matmult bsort100 crc ud fft1 statemate
+BENCH_OBJS   = $(addprefix $(BENCH_OBJDIR)/,$(addsuffix .o,$(BENCH_NAMES)))
+BENCH_CFLAGS = -std=gnu89 -O0 -fno-builtin -fno-stack-protector
+
+$(BENCH_OBJDIR):
+	mkdir -p $@
+
+$(BENCH_OBJDIR)/%.o: $(BENCH_DIR)/%.c | $(BENCH_OBJDIR)
+	$(CC) $(BENCH_CFLAGS) -Dmain=bench_entry_$* -c $< -o $@
+	objcopy --keep-global-symbol=bench_entry_$* $@
+
+benchmarks: $(BENCH_OBJS)
 
 # -----------------------------------------------------------------------
 #  Main binary (main.cc)
@@ -47,8 +75,8 @@ example_full_pipeline: $(EXAMPLES_DIR)/example_full_pipeline.cpp team_manager.cp
 example_from_plan: $(EXAMPLES_DIR)/example_from_plan.cpp team_manager.cpp team_manager.hpp dag.cpp parser_json.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_from_plan.cpp team_manager.cpp dag.cpp parser_json.cpp
 
-example_eval: $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp team_manager.hpp dag.cpp parser_json.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp dag.cpp parser_json.cpp
+example_eval: $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp team_manager.hpp dag.cpp parser_json.cpp bench_registry.cpp bench_registry.hpp $(BENCH_OBJS) $(HDRS)
+	$(CXX) $(CXXFLAGS) -I. -pthread -o $@ $(EXAMPLES_DIR)/example_eval.cpp team_manager.cpp dag.cpp parser_json.cpp bench_registry.cpp $(BENCH_OBJS)
 
 example_bin_packing: $(EXAMPLES_DIR)/example_bin_packing.cpp parser_json.cpp dag.cpp allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I. -o $@ $(EXAMPLES_DIR)/example_bin_packing.cpp parser_json.cpp dag.cpp
@@ -126,5 +154,6 @@ clean:
 	      example_saturation example_heuristic_eval show_alloc \
 	      codegen
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
+	rm -rf $(BENCH_OBJDIR)
 
-.PHONY: clean examples tests test codegen_run
+.PHONY: clean examples tests test codegen_run benchmarks
