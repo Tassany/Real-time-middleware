@@ -4,7 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <stdexcept>
-#include "../team_manager.hpp"
+#include "team_manager.hpp"
 
 // Helper: build a minimal SubtaskInfo
 static SubtaskInfo make_info(int id, int core = 0, int priority = 10,

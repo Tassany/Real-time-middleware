@@ -484,7 +484,7 @@ Full flow from the JSON file to active real-time threads:
 
 ```mermaid
 flowchart TD
-    A["📄 deployment_plan.json"] --> B
+    A["📄 plans/deployment_plan.json"] --> B
 
     B["JsonParser::parse(filename)"]
     B --> C["DeploymentPlan\n(hosts, tasks, connections)"]
@@ -743,7 +743,7 @@ sequenceDiagram
 
 ## 8. Pipeline Activation Graph
 
-Example from `deployment_plan.json`: 6 independent pipelines with Rate-Monotonic scheduling (shorter period → higher priority):
+Example from `plans/deployment_plan.json`: 6 independent pipelines with Rate-Monotonic scheduling (shorter period → higher priority):
 
 ```mermaid
 graph LR
@@ -946,11 +946,11 @@ graph LR
 | `example_dispatcher` | Direct dispatcher (no TeamManager): source→consumer, 1 second spacing | How to create and connect subtasks manually |
 | `example_pipeline` | Manual linear pipeline with ring buffer | Full pattern: write on upstream, read on downstream |
 | `example_team_manager` | High-level API with TeamManager | How to use the recommended API; initialize→start→notify→stop cycle |
-| `example_full_pipeline` | 6 RMS pipelines, 18 subtasks, runs for 192 ms | Main demo; implicitly uses `deployment_plan.json` |
+| `example_full_pipeline` | 6 RMS pipelines, 18 subtasks, runs for 192 ms | Main demo; implicitly uses `plans/deployment_plan.json` |
 | `example_from_plan` | Loads JSON, constructs DAG, and executes | How to integrate the parser with TeamManager |
 | `example_eval` | Measures latency, jitter, deadline misses per subtask | Benchmarking tool; requires `sudo` for SCHED_FIFO |
 
-> **Note on permissions:** `SCHED_FIFO` requires the `CAP_SYS_NICE` capability (equivalent to root). Without it, `pthread_setschedparam` fails silently and threads run at the default priority. The dispatcher prints a warning to stderr. For realistic latency results, run with `sudo ./example_eval deployment_plan.json`.
+> **Note on permissions:** `SCHED_FIFO` requires the `CAP_SYS_NICE` capability (equivalent to root). Without it, `pthread_setschedparam` fails silently and threads run at the default priority. The dispatcher prints a warning to stderr. For realistic latency results, run with `sudo ./example_eval plans/deployment_plan.json`.
 
 ### Tests × Modules
 
@@ -1019,7 +1019,7 @@ graph LR
 
 ### Deviation 6 — 🔵 INFO: Code generation (Phase 6) pending
 
-`tools/codegen.cpp` exists but is incomplete. The goal is to read a `deployment_plan.json` and automatically generate the C++ code with `RingBuffer<T,N>` instantiated with the correct `N` values, the specialised `Component` types, and a `Makefile`. Currently the user must instantiate these types manually based on `ring_buffer_size()` values.
+`tools/codegen.cpp` exists but is incomplete. The goal is to read a `plans/deployment_plan.json` and automatically generate the C++ code with `RingBuffer<T,N>` instantiated with the correct `N` values, the specialised `Component` types, and a `Makefile`. Currently the user must instantiate these types manually based on `ring_buffer_size()` values.
 
 ---
 

@@ -12,7 +12,7 @@ implantação, constroí os `Dispatcher`s, conecta os subtasks entre si seguindo
 dependências, e gerencia o ciclo de vida completo do sistema em execução.
 
 ```
-deployment_plan.json
+plans/deployment_plan.json
         │  parser_json.cpp → DeploymentPlan
         ▼
    TeamManager
@@ -173,7 +173,7 @@ com o mesmo par compartilham thread, fila e eventfd. A ordem em que cada par apa
 primeira vez em `dispatcher_order_` é preservada para garantir start/stop correto.
 
 ```
-Exemplo com deployment_plan.json (18 subtasks, 3 cores × 6 prioridades):
+Exemplo com plans/deployment_plan.json (18 subtasks, 3 cores × 6 prioridades):
 
   subtask 1 (core=0, prio=80) → Dispatcher(0,80) criado, dispatcher_order_[0]
   subtask 2 (core=1, prio=80) → Dispatcher(1,80) criado, dispatcher_order_[1]

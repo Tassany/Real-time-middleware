@@ -137,7 +137,7 @@ The Configuration Layer is responsible for representing, loading, and validating
 ```mermaid
 graph LR
     subgraph CFG["Configuration Layer"]
-        JSON["deployment_plan.json"]
+        JSON["plans/deployment_plan.json"]
         JP["JsonParser\n::parse()"]
         DP["DeploymentPlan"]
         HI["HostInfo[]"]

@@ -1,0 +1,61 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "Real-time-middleware",
+  "description": "C++17 reimplementation of the MCFlow middleware for dependent task graphs on multi-core platforms, extended with configurable bin-packing core allocation (First Fit, Best Fit, Worst Fit, with period and utilization sort criteria) and a measurement harness that reports per-job scheduling latency, jitter and deadline misses under SCHED_FIFO on Linux PREEMPT_RT.",
+  "codeRepository": "https://github.com/Tassany/Real-time-middleware",
+  "programmingLanguage": [
+    {
+      "@type": "ComputerLanguage",
+      "name": "C++",
+      "version": "C++17"
+    },
+    {
+      "@type": "ComputerLanguage",
+      "name": "Python",
+      "version": "3"
+    }
+  ],
+  "runtimePlatform": "Linux with PREEMPT_RT, tested on Raspberry Pi 5 (Cortex-A76)",
+  "operatingSystem": "Linux",
+  "license": "https://spdx.org/licenses/MIT",
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Tassany",
+      "familyName": "Onofre de Oliveira",
+      "email": "tassany.onofre-de-oliveira@enac.fr",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "ENAC - Ecole Nationale de l'Aviation Civile, Toulouse, France"
+      }
+    }
+  ],
+  "keywords": [
+    "real-time systems",
+    "middleware",
+    "multi-core scheduling",
+    "task graph",
+    "bin packing",
+    "SCHED_FIFO",
+    "PREEMPT_RT"
+  ],
+  "referencePublication": {
+    "@type": "ScholarlyArticle",
+    "name": "MCFlow: a Real-time Multi-core Aware Middleware for Dependent Task Graphs",
+    "author": "Huang-Ming Huang, Christopher Gill, Chenyang Lu",
+    "datePublished": "2012",
+    "publisher": {
+      "@type": "Organization",
+      "name": "2012 IEEE International Conference on Embedded and Real-Time Computing Systems and Applications (RTCSA)"
+    }
+  },
+  "softwareRequirements": [
+    "g++ with C++17 support",
+    "GNU binutils (objcopy)",
+    "GNU make",
+    "Python 3 with pandas and matplotlib (plotting scripts only)"
+  ],
+  "readme": "https://github.com/Tassany/Real-time-middleware/blob/main/README.md",
+  "developmentStatus": "active"
+}

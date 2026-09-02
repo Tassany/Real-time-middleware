@@ -1,0 +1,16 @@
+Authors of Real-time-middleware
+===============================
+
+Roles follow the contributor taxonomy suggested by the Software Heritage
+guidelines for archiving research software (Di Cosmo, 2020).
+
+Tassany Onofre de Oliveira <tassany.onofre-de-oliveira@enac.fr>
+    ENAC - Ecole Nationale de l'Aviation Civile, Toulouse, France
+    ORCID: <TODO: fill in before submitting the article>
+    Roles: Design, Architecture, Coding, Testing, Documentation, Maintenance
+
+<TODO: add co-authors / supervisors here, with affiliation and ORCID, if they
+are to be credited in the software citation as well as in the article.>
+
+Third-party code redistributed in this repository is credited in NOTICE.md and
+is not covered by the list above.

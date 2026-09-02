@@ -24,9 +24,9 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cstdlib>
-#include "../include/nlohmann/json.hpp"
-#include "../dag.hpp"
-#include "../ring_buffer.hpp"
+#include <nlohmann/json.hpp>
+#include "dag.hpp"
+#include "ring_buffer.hpp"
 
 using json = nlohmann::json;
 

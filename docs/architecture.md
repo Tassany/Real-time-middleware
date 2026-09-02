@@ -157,7 +157,7 @@ classDiagram
     TaskInfo       "1" *-- "N" SubtaskInfo
 ```
 
-### Example: `deployment_plan.json` topology
+### Example: `plans/deployment_plan.json` topology
 
 Six independent pipelines, each with period assigned by Rate-Monotonic Scheduling (shorter period → higher priority):
 

@@ -207,7 +207,7 @@ A implementação é restrita a **um único host multi-core**. Os mecanismos de 
 
 ### Lacunas Pendentes (escopo single-host)
 
-1. **Codegen** — ferramenta `tools/codegen.cpp` que gera C++ + Makefile a partir do `deployment_plan.json` (Fase 7)
+1. **Codegen** — ferramenta `tools/codegen.cpp` que gera C++ + Makefile a partir do `plans/deployment_plan.json` (Fase 7)
 2. **`preallocate()` forçado** — framework não garante que seja chamado antes do loop real-time; depende do usuário
 3. **Seleção intra-core vs inter-core** — ring buffer usado para todas as conexões inter-thread; chamada direta para intra-core não está automatizada
 4. **`static_assert` de N** — ring buffer não verifica em compile time que `N ≥ pipeline_depth`
@@ -233,11 +233,11 @@ Fase 6: codegen — única fase pendente no roadmap.
 
 **Objetivo**: fazer o projeto compilar e estabelecer baseline testável.
 
-**Arquivos modificados**: `deployment_plan.hpp`, `deployment_plan.json`, `parser_json.cpp`
+**Arquivos modificados**: `deployment_plan.hpp`, `plans/deployment_plan.json`, `parser_json.cpp`
 
 **Tarefas**:
 - Adicionar `uint64_t period_ns` e `uint64_t deadline_ns` em `SubtaskInfo`
-- Adicionar campos `period_ns` e `deadline_ns` em cada subtask no `deployment_plan.json`
+- Adicionar campos `period_ns` e `deadline_ns` em cada subtask no `plans/deployment_plan.json`
 - Validar que parser usa `.value("period_ns", uint64_t(0))` com defaults seguros
 
 **Critérios de Aceitação**:
@@ -422,12 +422,12 @@ Fase 6: codegen — única fase pendente no roadmap.
 
 ### Fase 6 — Ferramenta de Deployment e Geração de Código
 
-**Objetivo**: gerar C++ + Makefile automaticamente a partir do `deployment_plan.json` para um único host multi-core.
+**Objetivo**: gerar C++ + Makefile automaticamente a partir do `plans/deployment_plan.json` para um único host multi-core.
 
 **Arquivos novos**: `tools/codegen.cpp`
 
 **Tarefas**:
-- Ler `deployment_plan.json`; emitir um `main_generated.cpp` com:
+- Ler `plans/deployment_plan.json`; emitir um `main_generated.cpp` com:
   - Instanciação de componentes por `component_type` (lido do plano)
   - `RingBuffer<T, N>` por aresta, com `N = TeamManager::ring_buffer_size(u, v)` calculado em tempo de geração
   - `static_assert(N >= pipeline_depth)` para cada buffer gerado
@@ -436,7 +436,7 @@ Fase 6: codegen — única fase pendente no roadmap.
 - Emitir `Makefile` com target `run` que compila e executa o binário gerado
 
 **Critérios de Aceitação**:
-- `./codegen deployment_plan.json` gera código que compila sem warnings
+- `./codegen plans/deployment_plan.json` gera código que compila sem warnings
 - Código gerado reproduz o comportamento de `main.cc` para a pipeline atual
 - Ring buffer size calculado automaticamente; `static_assert` falha se `N < pipeline_depth`
 - DAG diamond no plano: fan-in gerado corretamente

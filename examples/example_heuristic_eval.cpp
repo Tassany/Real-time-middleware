@@ -2,7 +2,7 @@
  * example_heuristic_eval.cpp
  *
  * Gera N grupos de tarefas (source → intermediate → sink) com períodos e
- * prioridades variados (seguindo a estrutura do deployment_plan.json), aplica
+ * prioridades variados (seguindo a estrutura do plans/deployment_plan.json), aplica
  * cada heurística de bin-packing (FF, BF, WF) para atribuir cores, executa o
  * runtime do MCFlow e compara latência, jitter e deadline misses.
  *
@@ -10,7 +10,7 @@
  *   ./example_heuristic_eval [num_grupos] [num_cores]
  *   sudo ./example_heuristic_eval ...   (SCHED_FIFO — medições mais limpas)
  *
- * Tipos de tasks (ciclam a cada 6 grupos, como no deployment_plan.json):
+ * Tipos de tasks (ciclam a cada 6 grupos, como no plans/deployment_plan.json):
  *   Tipo 0: período 1ms,  prioridade 80
  *   Tipo 1: período 2ms,  prioridade 65
  *   Tipo 2: período 6ms,  prioridade 50
@@ -68,7 +68,7 @@ static constexpr uint64_t WCET_INTERMEDIATE = 74474;
 static constexpr uint64_t WCET_SINK         = 29931;
 
 // ---------------------------------------------------------------------------
-//  Tipos de task (ciclo de 6, igual ao deployment_plan.json)
+//  Tipos de task (ciclo de 6, igual ao plans/deployment_plan.json)
 // ---------------------------------------------------------------------------
 struct TaskType {
     uint64_t period_ns;

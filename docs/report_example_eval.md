@@ -20,7 +20,7 @@ The evaluation runs in 9 main steps:
 
 | # | Step | Description |
 |---|------|-------------|
-| 1 | Parse plan | Reads `<deployment_plan.json>` via `JsonParser` |
+| 1 | Parse plan | Reads `<plans/deployment_plan.json>` via `JsonParser` |
 | 2 | Predecessor map | Builds `preds[downstream] → [upstreams]` from connection entries |
 | 3 | Shared state | Allocates an `atomic<double>[]` array (one slot per subtask id) to simulate data flow |
 | 4 | Tick parameters | Computes `min_p` (smallest period), `lcm_p` (LCM of all periods), and `ticks = 4 × lcm_p / min_p` |
@@ -256,5 +256,5 @@ Column reference:
 > **Tip:** run with `sudo` to enable `SCHED_FIFO` and obtain cleaner measurements free from OS scheduler interference.
 
 ```bash
-sudo ./example_eval deployment_plan.json
+sudo ./example_eval plans/deployment_plan.json
 ```

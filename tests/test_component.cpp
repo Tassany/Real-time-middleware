@@ -3,8 +3,8 @@
 #include <vector>
 #include <string>
 #include <type_traits>
-#include "../component.hpp"
-#include "../adapter.hpp"
+#include "component.hpp"
+#include "adapter.hpp"
 
 // ---------------------------------------------------------------
 //  Helpers: detectar presença de input_type / output_type

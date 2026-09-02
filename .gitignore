@@ -6,6 +6,7 @@
 *.lo
 *.o
 *.obj
+wcet_bench/obj/
 
 # Precompiled Headers
 *.gch
@@ -48,7 +49,21 @@
 # debug information files
 *.dwo
 
+# Reference papers (Huang2012, verucchi2023, ...): cited in docs/ and
+# NOTICE.md, never redistributed here.
+*.pdf
 
-include/
+# macOS resource forks shipped inside the Malardalen archive.
+__MACOSX/
+
+# Volatile outputs. The binaries always write to the current directory with a
+# fixed name (examples/example_eval.cpp:342, scripts/plot_latency.py:136);
+# curated copies live under results/.
+/latency_samples.csv
+/latency_boxplot*.png
+/latency_heuristic_*.csv
+/heuristic_eval_runs.csv
+/heuristic_eval_summary.csv
+/sweep_out/
+
 .vscode/
-Huang2012.pdf

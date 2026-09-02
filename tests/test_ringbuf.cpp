@@ -3,7 +3,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
-#include "../ring_buffer.hpp"
+#include "ring_buffer.hpp"
 
 // ----------------------------------------------------------------
 // Fase 2 — T1: slot_size() deve ser múltiplo de 64 bytes

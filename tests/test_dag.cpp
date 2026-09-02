@@ -2,7 +2,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
-#include "../dag.hpp"
+#include "dag.hpp"
 
 // Chain 1→2→3→4
 static void test_dag_linear() {

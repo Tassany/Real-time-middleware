@@ -1,0 +1,1686 @@
+{
+  "hosts": [
+    {
+      "name": "localhost",
+      "address": "127.0.0.1"
+    }
+  ],
+  "allocation": {
+    "strategy": "first_fit",
+    "sort_by": "none",
+    "weight": "utilization",
+    "num_cores": 3,
+    "capacity": 0.0
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "subtasks": [
+        {
+          "id": 1,
+          "component_type": "source",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 2,
+          "component_type": "sink",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "subtasks": [
+        {
+          "id": 3,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 4,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 5,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 6,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 7,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "subtasks": [
+        {
+          "id": 8,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 9,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "subtasks": [
+        {
+          "id": 10,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 11,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "subtasks": [
+        {
+          "id": 12,
+          "component_type": "source",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 13,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 14,
+          "component_type": "sink",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "subtasks": [
+        {
+          "id": 15,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 16,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "subtasks": [
+        {
+          "id": 17,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 18,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "subtasks": [
+        {
+          "id": 19,
+          "component_type": "source",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 20,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 21,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 22,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 23,
+          "component_type": "sink",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "subtasks": [
+        {
+          "id": 24,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 25,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 26,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "subtasks": [
+        {
+          "id": 27,
+          "component_type": "source",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 28,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 29,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 30,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 31,
+          "component_type": "sink",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "subtasks": [
+        {
+          "id": 32,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 33,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 34,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "subtasks": [
+        {
+          "id": 35,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 36,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 37,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 38,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "subtasks": [
+        {
+          "id": 39,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 40,
+          "component_type": "intermediate",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 41,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "subtasks": [
+        {
+          "id": 42,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 43,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 44,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 45,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 46,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "subtasks": [
+        {
+          "id": 47,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 48,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 49,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 50,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 51,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "subtasks": [
+        {
+          "id": 52,
+          "component_type": "source",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 53,
+          "component_type": "intermediate",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 54,
+          "component_type": "intermediate",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 55,
+          "component_type": "sink",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "subtasks": [
+        {
+          "id": 56,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 57,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 58,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "subtasks": [
+        {
+          "id": 59,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 60,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "subtasks": [
+        {
+          "id": 61,
+          "component_type": "source",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 62,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 63,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 64,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 65,
+          "component_type": "sink",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "subtasks": [
+        {
+          "id": 66,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 67,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 68,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "subtasks": [
+        {
+          "id": 69,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 70,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 71,
+          "component_type": "intermediate",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 72,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "subtasks": [
+        {
+          "id": 73,
+          "component_type": "source",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 74,
+          "component_type": "sink",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "subtasks": [
+        {
+          "id": 75,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 76,
+          "component_type": "intermediate",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 77,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "subtasks": [
+        {
+          "id": 78,
+          "component_type": "source",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 79,
+          "component_type": "sink",
+          "priority": 60,
+          "period_ns": 4000000,
+          "deadline_ns": 4000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "subtasks": [
+        {
+          "id": 80,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 81,
+          "component_type": "intermediate",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 82,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "subtasks": [
+        {
+          "id": 83,
+          "component_type": "source",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 84,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 85,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 86,
+          "component_type": "intermediate",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 87,
+          "component_type": "sink",
+          "priority": 70,
+          "period_ns": 3000000,
+          "deadline_ns": 3000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "subtasks": [
+        {
+          "id": 88,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 48050,
+          "benchmark": "matmult"
+        },
+        {
+          "id": 89,
+          "component_type": "intermediate",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 90,
+          "component_type": "intermediate",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 91,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "subtasks": [
+        {
+          "id": 92,
+          "component_type": "source",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 93,
+          "component_type": "intermediate",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 94,
+          "component_type": "sink",
+          "priority": 40,
+          "period_ns": 12000000,
+          "deadline_ns": 12000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "subtasks": [
+        {
+          "id": 95,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 96,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 789,
+          "benchmark": "ud"
+        },
+        {
+          "id": 97,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 98,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "subtasks": [
+        {
+          "id": 99,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        },
+        {
+          "id": 100,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 101,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        },
+        {
+          "id": 102,
+          "component_type": "intermediate",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 103,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 1000000,
+          "deadline_ns": 1000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "subtasks": [
+        {
+          "id": 104,
+          "component_type": "source",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 105,
+          "component_type": "intermediate",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 106,
+          "component_type": "sink",
+          "priority": 50,
+          "period_ns": 6000000,
+          "deadline_ns": 6000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 30310,
+          "benchmark": "bsort100"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "subtasks": [
+        {
+          "id": 107,
+          "component_type": "source",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 746,
+          "benchmark": "fft1"
+        },
+        {
+          "id": 108,
+          "component_type": "intermediate",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 207,
+          "benchmark": "statemate"
+        },
+        {
+          "id": 109,
+          "component_type": "sink",
+          "priority": 80,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 821,
+          "benchmark": "crc"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "upstream": 1,
+      "downstream": 2
+    },
+    {
+      "upstream": 3,
+      "downstream": 4
+    },
+    {
+      "upstream": 4,
+      "downstream": 5
+    },
+    {
+      "upstream": 5,
+      "downstream": 6
+    },
+    {
+      "upstream": 6,
+      "downstream": 7
+    },
+    {
+      "upstream": 8,
+      "downstream": 9
+    },
+    {
+      "upstream": 10,
+      "downstream": 11
+    },
+    {
+      "upstream": 12,
+      "downstream": 13
+    },
+    {
+      "upstream": 13,
+      "downstream": 14
+    },
+    {
+      "upstream": 15,
+      "downstream": 16
+    },
+    {
+      "upstream": 17,
+      "downstream": 18
+    },
+    {
+      "upstream": 19,
+      "downstream": 20
+    },
+    {
+      "upstream": 20,
+      "downstream": 21
+    },
+    {
+      "upstream": 21,
+      "downstream": 22
+    },
+    {
+      "upstream": 22,
+      "downstream": 23
+    },
+    {
+      "upstream": 24,
+      "downstream": 25
+    },
+    {
+      "upstream": 25,
+      "downstream": 26
+    },
+    {
+      "upstream": 27,
+      "downstream": 28
+    },
+    {
+      "upstream": 28,
+      "downstream": 29
+    },
+    {
+      "upstream": 29,
+      "downstream": 30
+    },
+    {
+      "upstream": 30,
+      "downstream": 31
+    },
+    {
+      "upstream": 32,
+      "downstream": 33
+    },
+    {
+      "upstream": 33,
+      "downstream": 34
+    },
+    {
+      "upstream": 35,
+      "downstream": 36
+    },
+    {
+      "upstream": 36,
+      "downstream": 37
+    },
+    {
+      "upstream": 37,
+      "downstream": 38
+    },
+    {
+      "upstream": 39,
+      "downstream": 40
+    },
+    {
+      "upstream": 40,
+      "downstream": 41
+    },
+    {
+      "upstream": 42,
+      "downstream": 43
+    },
+    {
+      "upstream": 43,
+      "downstream": 44
+    },
+    {
+      "upstream": 44,
+      "downstream": 45
+    },
+    {
+      "upstream": 45,
+      "downstream": 46
+    },
+    {
+      "upstream": 47,
+      "downstream": 48
+    },
+    {
+      "upstream": 48,
+      "downstream": 49
+    },
+    {
+      "upstream": 49,
+      "downstream": 50
+    },
+    {
+      "upstream": 50,
+      "downstream": 51
+    },
+    {
+      "upstream": 52,
+      "downstream": 53
+    },
+    {
+      "upstream": 53,
+      "downstream": 54
+    },
+    {
+      "upstream": 54,
+      "downstream": 55
+    },
+    {
+      "upstream": 56,
+      "downstream": 57
+    },
+    {
+      "upstream": 57,
+      "downstream": 58
+    },
+    {
+      "upstream": 59,
+      "downstream": 60
+    },
+    {
+      "upstream": 61,
+      "downstream": 62
+    },
+    {
+      "upstream": 62,
+      "downstream": 63
+    },
+    {
+      "upstream": 63,
+      "downstream": 64
+    },
+    {
+      "upstream": 64,
+      "downstream": 65
+    },
+    {
+      "upstream": 66,
+      "downstream": 67
+    },
+    {
+      "upstream": 67,
+      "downstream": 68
+    },
+    {
+      "upstream": 69,
+      "downstream": 70
+    },
+    {
+      "upstream": 70,
+      "downstream": 71
+    },
+    {
+      "upstream": 71,
+      "downstream": 72
+    },
+    {
+      "upstream": 73,
+      "downstream": 74
+    },
+    {
+      "upstream": 75,
+      "downstream": 76
+    },
+    {
+      "upstream": 76,
+      "downstream": 77
+    },
+    {
+      "upstream": 78,
+      "downstream": 79
+    },
+    {
+      "upstream": 80,
+      "downstream": 81
+    },
+    {
+      "upstream": 81,
+      "downstream": 82
+    },
+    {
+      "upstream": 83,
+      "downstream": 84
+    },
+    {
+      "upstream": 84,
+      "downstream": 85
+    },
+    {
+      "upstream": 85,
+      "downstream": 86
+    },
+    {
+      "upstream": 86,
+      "downstream": 87
+    },
+    {
+      "upstream": 88,
+      "downstream": 89
+    },
+    {
+      "upstream": 89,
+      "downstream": 90
+    },
+    {
+      "upstream": 90,
+      "downstream": 91
+    },
+    {
+      "upstream": 92,
+      "downstream": 93
+    },
+    {
+      "upstream": 93,
+      "downstream": 94
+    },
+    {
+      "upstream": 95,
+      "downstream": 96
+    },
+    {
+      "upstream": 96,
+      "downstream": 97
+    },
+    {
+      "upstream": 97,
+      "downstream": 98
+    },
+    {
+      "upstream": 99,
+      "downstream": 100
+    },
+    {
+      "upstream": 100,
+      "downstream": 101
+    },
+    {
+      "upstream": 101,
+      "downstream": 102
+    },
+    {
+      "upstream": 102,
+      "downstream": 103
+    },
+    {
+      "upstream": 104,
+      "downstream": 105
+    },
+    {
+      "upstream": 105,
+      "downstream": 106
+    },
+    {
+      "upstream": 107,
+      "downstream": 108
+    },
+    {
+      "upstream": 108,
+      "downstream": 109
+    }
+  ]
+}

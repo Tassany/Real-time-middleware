@@ -1,6 +1,6 @@
 # Report: Scheduling Evaluation on Raspberry Pi 5 / PREEMPT_RT
 
-Results of `sudo ./example_eval deployment_plan.json` on the target hardware.
+Results of `sudo ./example_eval plans/deployment_plan.json` on the target hardware.
 Written in English to match its sibling reports (`report_example_eval.md`,
 `report_heuristic_eval.md`).
 
@@ -11,7 +11,7 @@ Written in English to match its sibling reports (`report_example_eval.md`,
 | Hardware | Raspberry Pi 5 (Cortex-A76) |
 | OS | Linux with `PREEMPT_RT` |
 | Scheduling | `SCHED_FIFO` (run as root — RT priority applied) |
-| Plan | `deployment_plan.json` — 6 tasks × 3 subtasks, harmonic periods 1/2/6/12/24/48 ms |
+| Plan | `plans/deployment_plan.json` — 6 tasks × 3 subtasks, harmonic periods 1/2/6/12/24/48 ms |
 | Allocation | automatic: `worst_fit` + `priority_desc`, `weight: count`, 3 cores |
 | Run length | 192 ticks of 1 ms = **192 ms** (4 × LCM) |
 | Metric | `latency = t_actual − t_scheduled`, sampled at `execute()` entry |
@@ -24,7 +24,7 @@ can prove.
 
 ### 2.1 The plan no longer names cores
 
-`deployment_plan.json` declares no `core` on any subtask. Instead it carries a top-level
+`plans/deployment_plan.json` declares no `core` on any subtask. Instead it carries a top-level
 block:
 
 ```json
@@ -272,7 +272,7 @@ pipeline stage" vary together, perfectly. At least two explanations fit equally 
 
 Two cheap experiments separate them, both using artifacts already in the repo:
 
-- **`deployment_plan_test.json`** partitions by pipeline instead of by stage (task 1 →
+- **`plans/deployment_plan_test.json`** partitions by pipeline instead of by stage (task 1 →
   core 0, tasks 2–3 → core 1, tasks 4–6 → core 2), mixing stages onto every core.
 - **`"num_cores": 4`** in the existing plan scrambles the stages on its own (§2.6),
   with no new file at all.

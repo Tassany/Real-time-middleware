@@ -11,7 +11,7 @@ O MCFlow executa um grafo de subtasks periódicas em múltiplos núcleos com pri
 pilha tem três camadas:
 
 ```
-deployment_plan.json
+plans/deployment_plan.json
         │
         ▼
    TeamManager          ← lê o plano, agrupa subtasks, instancia Dispatchers
@@ -369,7 +369,7 @@ A separação entre `SubtaskInfo` e `Subtask` reflete uma separação arquitetur
 
 | Estrutura | Origem | Contém |
 |---|---|---|
-| `SubtaskInfo` | `deployment_plan.json` via `JsonParser` | metadados estáticos: `id`, `core`, `priority`, `period_ns`, `deadline_ns`, `component_type` |
+| `SubtaskInfo` | `plans/deployment_plan.json` via `JsonParser` | metadados estáticos: `id`, `core`, `priority`, `period_ns`, `deadline_ns`, `component_type` |
 | `Subtask` | criado pelo código da aplicação | comportamento dinâmico: `execute()` lambda, estado RT (`next_release_ns`, `fan_in_received`) |
 
 O `TeamManager::SubtaskEntry` combina os dois. O usuário cria os objetos `Subtask`, atribui o

@@ -1,0 +1,55 @@
+% Bin-packing heuristics compared under two load levels.
+% Sized for a single column of a two-column paper (IEEEtran / acmart).
+% Requires: \usepackage{booktabs}
+%
+% Source: results/heuristics-{lowsat,highsat}/{first,best,worst}_fit.csv
+% Provenance, commands and platform: results/README.md
+% Raspberry Pi 5, 3 cores, SCHED_FIFO, 50 hyperperiods, implicit deadlines.
+% Jitter is the per-subtask peak-to-peak spread (max minus min), averaged over
+% subtasks, as computed by example_eval.cpp. The whole-run peak-to-peak is not
+% reported because the minimum latency is sub-microsecond in every run, which
+% makes it numerically identical to the maximum column.
+
+\begin{table}[tb]
+  \centering
+  \footnotesize
+  \caption{Allocation heuristics under low saturation. 96 subtasks, 22{,}800 jobs.}
+  \label{tab:heuristics-low}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    & \multicolumn{3}{c}{Latency (ms)} & \multicolumn{2}{c}{Deadline misses} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-6}
+    Heuristic & Mean & Max & Jitter & Count & Rate \\
+    \midrule
+    First Fit & 16.503 & 582.118 & 151.701 & 3{,}276 & 14.37\% \\
+    Best Fit  & 16.256 & 575.977 & 149.342 & 3{,}646 & 15.99\% \\
+    Worst Fit & \textbf{1.025} & \textbf{10.695} & \textbf{5.091} & \textbf{511} & \textbf{2.24\%} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[tb]
+  \centering
+  \footnotesize
+  \caption{Allocation heuristics under high saturation. 162 subtasks, 69{,}000 jobs.}
+  \label{tab:heuristics-high}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    & \multicolumn{3}{c}{Latency (ms)} & \multicolumn{2}{c}{Deadline misses} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-6}
+    Heuristic & Mean & Max & Jitter & Count & Rate \\
+    \midrule
+    First Fit & \textbf{81.994} & 610.568 & \textbf{162.219} & \textbf{63{,}524}$^{\dagger}$ & \textbf{92.12\%} \\
+    Best Fit  & 100.294 & 582.477 & 196.663 & 66{,}753 & 96.74\% \\
+    Worst Fit & 101.017 & \textbf{175.483} & 173.719 & 68{,}676 & 99.53\% \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{2pt}
+  \footnotesize
+  \raggedright
+  $^{\dagger}$First Fit collected 68{,}959 jobs instead of 69{,}000. Subtask 153
+  ($T = 12$~ms, core 0, priority 40) ran 9 of its 50 jobs and the remaining 41 were
+  never dispatched. A job that never runs is not counted as a miss, so the First Fit
+  rate is understated.
+\end{table}

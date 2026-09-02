@@ -4,8 +4,8 @@
 #include <thread>
 #include <chrono>
 #include <vector>
-#include "../dispatcher.hpp"
-// #include "../demultiplexer.hpp"
+#include "dispatcher.hpp"
+// #include "demultiplexer.hpp"
 
 // -----------------------------------------------------------------------
 //  T1: Chain A→B→C via downstream connections
@@ -201,7 +201,7 @@ int main() {
     test_dispatcher_release_guard();
     test_dispatcher_in_processing();
     test_dispatcher_aperiodic();
-    test_demultiplexer_process();
+    // test_demultiplexer_process();  // T6 removed with demultiplexer.hpp (commit 9c16cab)
     std::cout << "\nTodos os testes da Fase 4 passaram.\n";
     return 0;
 }

@@ -1,7 +1,7 @@
 #include <cassert>
 #include <iostream>
 #include <fstream>
-#include "../parser_json.hpp"
+#include "parser_json.hpp"
 
 // Helper: cria um JSON temporário com o conteúdo fornecido
 static void write_tmp(const std::string& path, const std::string& content) {
@@ -10,8 +10,30 @@ static void write_tmp(const std::string& path, const std::string& content) {
 }
 
 static void test_parser_period_deadline() {
+    // Own fixture, like the two tests below. This used to parse
+    // plans/deployment_plan.json, which is a working artifact that changed shape
+    // (6 tasks x 3 subtasks, 1/2/6/12/24/48 ms) and broke the assertions here.
+    const std::string tmp = "/tmp/test_plan_period_deadline.json";
+    write_tmp(tmp, R"({
+        "hosts": [{"name": "h1", "address": "127.0.0.1"}],
+        "tasks": [{
+            "id": 1,
+            "subtasks": [
+                {"id": 1, "component_type": "source",       "priority": 80,
+                 "period_ns": 100000000, "deadline_ns": 100000000},
+                {"id": 2, "component_type": "intermediate", "priority": 70,
+                 "period_ns": 200000000, "deadline_ns": 200000000},
+                {"id": 3, "component_type": "intermediate", "priority": 60,
+                 "period_ns": 300000000, "deadline_ns": 300000000},
+                {"id": 4, "component_type": "sink",         "priority": 50,
+                 "period_ns": 400000000, "deadline_ns": 400000000}
+            ]
+        }],
+        "connections": []
+    })");
+
     JsonParser parser;
-    DeploymentPlan plan = parser.parse("deployment_plan.json");
+    DeploymentPlan plan = parser.parse(tmp);
 
     assert(!plan.tasks.empty());
     const auto& subtasks = plan.tasks[0].subtasks;

@@ -8,7 +8,7 @@
  * override wcet_ns, unlike example_bin_packing, which injects fixed Heptane
  * values and therefore ignores the WCETs written in the plan.
  *
- * Usage: ./show_alloc <deployment_plan.json>
+ * Usage: ./show_alloc <plans/deployment_plan.json>
  */
 #include "deployment_plan.hpp"
 #include "parser_json.hpp"
@@ -20,7 +20,7 @@
 #include <map>
 
 int main(int argc, char* argv[]) {
-    const std::string file = (argc > 1) ? argv[1] : "deployment_plan.json";
+    const std::string file = (argc > 1) ? argv[1] : "plans/deployment_plan.json";
 
     DeploymentPlan plan;
     try {

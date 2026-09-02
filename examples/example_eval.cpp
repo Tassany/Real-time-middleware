@@ -20,7 +20,7 @@
  *     latency     = t_actual - t_scheduled
  *
  * Usage:
- *   ./example_eval <deployment_plan.json>
+ *   ./example_eval <plans/deployment_plan.json>
  *   sudo ./example_eval ...    (enables SCHED_FIFO; cleaner measurements)
  */
 
@@ -91,7 +91,7 @@ static int64_t vmax(const std::vector<int64_t>& v) {
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <deployment_plan.json> [hyperperiods]\n"
+        std::cerr << "Usage: " << argv[0] << " <plans/deployment_plan.json> [hyperperiods]\n"
                   << "       sudo " << argv[0] << " ...  (for SCHED_FIFO)\n"
                   << "  hyperperiods: number of hyperperiods to simulate (default 4)\n";
         return 1;

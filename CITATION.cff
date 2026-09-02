@@ -1,0 +1,54 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Real-time-middleware: a C++ reimplementation of the MCFlow multi-core real-time middleware"
+abstract: >-
+  C++17 reimplementation of the MCFlow middleware for dependent task graphs on
+  multi-core platforms, extended with configurable bin-packing core allocation
+  (First Fit, Best Fit, Worst Fit, with period and utilization sort criteria)
+  and a measurement harness that reports per-job scheduling latency, jitter and
+  deadline misses under SCHED_FIFO on Linux PREEMPT_RT.
+type: software
+authors:
+  - family-names: "Onofre de Oliveira"
+    given-names: "Tassany"
+    email: "tassany.onofre-de-oliveira@enac.fr"
+    affiliation: "ENAC - Ecole Nationale de l'Aviation Civile, Toulouse, France"
+    # TODO: uncomment and fill in before submitting the article.
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/Tassany/Real-time-middleware"
+license: MIT
+keywords:
+  - real-time systems
+  - middleware
+  - multi-core scheduling
+  - task graph
+  - bin packing
+  - SCHED_FIFO
+  - PREEMPT_RT
+references:
+  - type: conference-paper
+    title: "MCFlow: a Real-time Multi-core Aware Middleware for Dependent Task Graphs"
+    authors:
+      - family-names: "Huang"
+        given-names: "Huang-Ming"
+      - family-names: "Gill"
+        given-names: "Christopher"
+      - family-names: "Lu"
+        given-names: "Chenyang"
+    collection-title: "2012 IEEE International Conference on Embedded and Real-Time Computing Systems and Applications (RTCSA)"
+    year: 2012
+    notes: "Reference paper reimplemented by this software."
+
+# TODO: once the article is published, uncomment this block and fill it in, so
+# that citing this software also credits the article. Keep the fields that
+# apply to the venue (conference-paper, article, ...) and delete the rest.
+#
+# preferred-citation:
+#   type: conference-paper
+#   title: "<article title>"
+#   authors:
+#     - family-names: "Onofre de Oliveira"
+#       given-names: "Tassany"
+#   collection-title: "<proceedings / journal>"
+#   year: <year>
+#   doi: "<doi>"

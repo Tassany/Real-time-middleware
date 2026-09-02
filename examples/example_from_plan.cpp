@@ -4,7 +4,7 @@
  * Reads a deployment plan JSON and executes the pipeline dynamically,
  * without code generation (Phase 6 pending).
  *
- * Usage: ./example_from_plan <deployment_plan.json> [hyperperiods]
+ * Usage: ./example_from_plan <plans/deployment_plan.json> [hyperperiods]
  *
  * Generic component semantics (demo):
  *   source       — increments a per-subtask counter
@@ -32,7 +32,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <deployment_plan.json> [hyperperiods]\n"
+        std::cerr << "Usage: " << argv[0] << " <plans/deployment_plan.json> [hyperperiods]\n"
                   << "  hyperperiods: number of hyperperiods to simulate (default 4)\n";
         return 1;
     }
