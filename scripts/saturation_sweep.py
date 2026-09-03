@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 saturation_sweep.py — finds where the scheduler saturates by growing the task
-set step by step and running example_eval on each generated plan.
+set step by step and running evaluation on each generated plan.
 
-Usage (run on the board, as root so example_eval gets SCHED_FIFO):
+Usage (run on the board, as root so evaluation gets SCHED_FIFO):
     sudo python3 scripts/saturation_sweep.py
     sudo python3 scripts/saturation_sweep.py --start 0.5 --stop 6 --step 0.5
 
@@ -137,7 +137,7 @@ def sample_stats(path):
 
 
 def run_step(binary, plan_path, hyperperiods, timeout):
-    """Runs example_eval. Returns (summary_dict, error_string_or_None)."""
+    """Runs evaluation. Returns (summary_dict, error_string_or_None)."""
     try:
         p = subprocess.run([binary, plan_path, str(hyperperiods)],
                            capture_output=True, text=True, timeout=timeout)
@@ -168,7 +168,7 @@ def main():
     ap.add_argument("--strategy", default="worst_fit")
     ap.add_argument("--sort-by", default="none")
     ap.add_argument("--hyperperiods", type=int, default=20)
-    ap.add_argument("--binary", default="./example_eval")
+    ap.add_argument("--binary", default="./evaluation")
     ap.add_argument("--outdir", default="sweep_out")
     ap.add_argument("--timeout", type=int, default=300,
                     help="per-run timeout in seconds")
@@ -177,10 +177,10 @@ def main():
     args = ap.parse_args()
 
     if not os.access(args.binary, os.X_OK):
-        sys.exit(f"{args.binary} not found or not executable; run `make example_eval` first")
+        sys.exit(f"{args.binary} not found or not executable; run `make evaluation` first")
 
     if os.geteuid() != 0:
-        print("WARNING: not running as root, so example_eval cannot apply "
+        print("WARNING: not running as root, so evaluation cannot apply "
               "SCHED_FIFO and every number below will be dominated by CFS "
               "scheduling noise.\n", file=sys.stderr)
 
@@ -213,7 +213,7 @@ def main():
 
         row = {"level": level, "error": err or "", **st, **summary}
 
-        # example_eval writes latency_samples.csv into the cwd.
+        # evaluation writes latency_samples.csv into the cwd.
         if not err and os.path.exists("latency_samples.csv"):
             dest = os.path.join(args.outdir, f"latency_{tag}.csv")
             shutil.move("latency_samples.csv", dest)

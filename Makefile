@@ -3,6 +3,7 @@ CC       = gcc
 CXXFLAGS = -std=c++17 -Wall -Iinclude -Isrc
 
 EXAMPLES_DIR = examples
+SCRIPTS_DIR  = scripts
 
 # -----------------------------------------------------------------------
 #  Mälardalen benchmarks as subtask bodies
@@ -73,17 +74,17 @@ example_team_manager: $(EXAMPLES_DIR)/example_team_manager.cpp $(SRC_DIR)/team_m
 example_full_pipeline: $(EXAMPLES_DIR)/example_full_pipeline.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $(EXAMPLES_DIR)/example_full_pipeline.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp
 
-example_from_plan: $(EXAMPLES_DIR)/example_from_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -pthread -o $@ $(EXAMPLES_DIR)/example_from_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp
+execute_plan: $(SCRIPTS_DIR)/execute_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/execute_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp
 
-example_eval: $(EXAMPLES_DIR)/example_eval.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(SRC_DIR)/bench_registry.hpp $(BENCH_OBJS) $(HDRS)
-	$(CXX) $(CXXFLAGS) -pthread -o $@ $(EXAMPLES_DIR)/example_eval.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(BENCH_OBJS)
+evaluation: $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(SRC_DIR)/bench_registry.hpp $(BENCH_OBJS) $(HDRS)
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(BENCH_OBJS)
 
 example_bin_packing: $(EXAMPLES_DIR)/example_bin_packing.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(EXAMPLES_DIR)/example_bin_packing.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp
 
-show_alloc: $(EXAMPLES_DIR)/show_alloc.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/allocator.hpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -o $@ $(EXAMPLES_DIR)/show_alloc.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp
+allocate: $(SCRIPTS_DIR)/allocate.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/allocator.hpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -o $@ $(SCRIPTS_DIR)/allocate.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp
 
 example_saturation: $(EXAMPLES_DIR)/example_saturation.cpp $(SRC_DIR)/allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(EXAMPLES_DIR)/example_saturation.cpp
@@ -94,7 +95,13 @@ example_heuristic_eval: $(EXAMPLES_DIR)/example_heuristic_eval.cpp $(SRC_DIR)/te
 example_eval_preemptive: $(EXAMPLES_DIR)/example_eval_preemptive.cpp $(SRC_DIR)/preemptive_team_manager.cpp $(SRC_DIR)/preemptive_team_manager.hpp $(SRC_DIR)/preemptive_dispatcher.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $(EXAMPLES_DIR)/example_eval_preemptive.cpp $(SRC_DIR)/preemptive_team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp
 
-examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline example_team_manager example_full_pipeline example_from_plan example_eval
+examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline example_team_manager example_full_pipeline
+
+# -----------------------------------------------------------------------
+#  Tooling (scripts/): the programs the experiments are run with, as opposed
+#  to the demos in examples/.
+# -----------------------------------------------------------------------
+harness: allocate execute_plan evaluation
 
 # -----------------------------------------------------------------------
 #  Phase 6 — Code generator
@@ -151,10 +158,10 @@ clean:
 	rm -f $(TARGET) $(TESTS_BINS) \
 	      example_ring example_eventfd example_two_threads example_dispatcher \
 	      example_epoll example_pipeline example_team_manager example_full_pipeline \
-	      example_from_plan example_eval example_bin_packing \
-	      example_saturation example_heuristic_eval show_alloc \
+	      execute_plan evaluation example_bin_packing \
+	      example_saturation example_heuristic_eval allocate \
 	      codegen
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 	rm -rf $(BENCH_OBJDIR)
 
-.PHONY: clean examples tests test codegen_run benchmarks
+.PHONY: clean examples harness tests test codegen_run benchmarks

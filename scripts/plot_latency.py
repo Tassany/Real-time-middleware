@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-plot_latency.py — Boxplot of per-job scheduling latency from example_eval output.
+plot_latency.py — Boxplot of per-job scheduling latency from evaluation output.
 
 Usage:
     python3 plot_latency.py [latency_samples.csv] [--max-latency US]

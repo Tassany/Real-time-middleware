@@ -1,10 +1,10 @@
 /**
- * example_from_plan.cpp
+ * execute_plan.cpp
  *
  * Reads a deployment plan JSON and executes the pipeline dynamically,
  * without code generation (Phase 6 pending).
  *
- * Usage: ./example_from_plan <plans/deployment_plan.json> [hyperperiods]
+ * Usage: ./execute_plan <plans/deployment_plan.json> [hyperperiods]
  *
  * Generic component semantics (demo):
  *   source       — increments a per-subtask counter

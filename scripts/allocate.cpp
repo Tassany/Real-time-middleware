@@ -1,5 +1,5 @@
 /*
- * show_alloc — inspects the core assignment produced by the plan's own
+ * allocate — inspects the core assignment produced by the plan's own
  * "allocation" block.
  *
  * JsonParser::parse() already calls allocator::apply_auto_allocation() for any
@@ -8,7 +8,7 @@
  * override wcet_ns, unlike example_bin_packing, which injects fixed Heptane
  * values and therefore ignores the WCETs written in the plan.
  *
- * Usage: ./show_alloc <plans/deployment_plan.json>
+ * Usage: ./allocate <plans/deployment_plan.json>
  */
 #include "deployment_plan.hpp"
 #include "parser_json.hpp"

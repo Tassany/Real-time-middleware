@@ -15,7 +15,7 @@ wcet_ns comes from the table of the selected platform. Priorities are
 rate-monotonic: the shortest period gets --prio-high, the longest --prio-low.
 
 The load is not a knob. You ask for N tasks and the script reports the
-utilization that came out, the same way show_alloc would.
+utilization that came out, the same way allocate would.
 
 `core` is deliberately left out of every subtask, so the plan reaches
 allocator::apply_auto_allocation with CORE_UNASSIGNED and gets packed by the
@@ -119,7 +119,7 @@ def build_plan(rng, args):
 
 
 def plan_stats(tasks, conns, num_cores):
-    """The load figures the allocator and example_eval actually react to."""
+    """The load figures the allocator and evaluation actually react to."""
     all_st = [s for t in tasks for s in t["subtasks"]]
 
     util = sum(s["wcet_ns"] / s["period_ns"] for s in all_st)
@@ -206,7 +206,7 @@ def main():
     if args.min_subtasks < 2:
         sys.exit("--min-subtasks must be at least 2; a lone source has no sink, "
                  "and a sink with no predecessor makes preds.at(id) throw in "
-                 "example_from_plan.cpp and example_eval.cpp")
+                 "execute_plan.cpp and evaluation.cpp")
     if args.max_subtasks < args.min_subtasks:
         sys.exit("--max-subtasks must not be smaller than --min-subtasks")
 

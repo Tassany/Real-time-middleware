@@ -42,7 +42,9 @@ wcet_bench/obj/
 # Ancorados com / para nao pegar os fontes em examples/ e tests/.
 /main
 /codegen
-/show_alloc
+/allocate
+/evaluation
+/execute_plan
 /example_*
 /test_*
 
@@ -57,7 +59,7 @@ wcet_bench/obj/
 __MACOSX/
 
 # Volatile outputs. The binaries always write to the current directory with a
-# fixed name (examples/example_eval.cpp:342, scripts/plot_latency.py:136);
+# fixed name (examples/evaluation.cpp:342, scripts/plot_latency.py:136);
 # curated copies live under results/.
 /latency_samples.csv
 /latency_boxplot*.png
@@ -67,3 +69,6 @@ __MACOSX/
 /sweep_out/
 
 .vscode/
+
+.claude/
+

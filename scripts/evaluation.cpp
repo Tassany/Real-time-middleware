@@ -1,5 +1,5 @@
 /**
- * example_eval.cpp
+ * evaluation.cpp
  *
  * Evaluates scheduling quality for each subtask in a deployment plan:
  *
@@ -20,8 +20,8 @@
  *     latency     = t_actual - t_scheduled
  *
  * Usage:
- *   ./example_eval <plans/deployment_plan.json>
- *   sudo ./example_eval ...    (enables SCHED_FIFO; cleaner measurements)
+ *   ./evaluation <plans/deployment_plan.json>
+ *   sudo ./evaluation ...    (enables SCHED_FIFO; cleaner measurements)
  */
 
 #include <iostream>

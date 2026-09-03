@@ -1,8 +1,8 @@
 # Third-party material
 
 This repository is distributed under the MIT License (see `LICENSE`), which
-covers the code written for this project: `src/`, `examples/`, `tests/`,
-`scripts/`, `docs/` and the deployment plans in `plans/`. The items below come
+covers the code written for this project: `src/`, `examples/`,
+`scripts/` and the deployment plans in `plans/`. The items below come
 from elsewhere and keep their own terms.
 
 ## Malardalen WCET benchmarks — `wcet_bench/*.c`
