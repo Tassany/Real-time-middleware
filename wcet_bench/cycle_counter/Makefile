@@ -62,24 +62,47 @@ etapa4: etapa4.cpp
 #
 # As fontes em ../ nunca sao modificadas. Toda a adaptacao esta' nas flags.
 # ---------------------------------------------------------------------------
-# As 34 fontes Malardalen que sao medives. Sao as 37 de ../ menos tres, que
-# ficam de fora por defeito da propria fonte e nao do harness:
+# As 32 fontes Malardalen que sao medives. Sao as 37 de ../ menos cinco, todas
+# excluidas por defeito da propria fonte e nao do harness.
+#
+# Nao compilam:
 #
 #   st.c     tem um `*/` orfao na linha 9, sobra de uma edicao de cabecalho.
-#            Nao compila.
 #   des.c    faz `#include <config.h>` e mais types.h, errors.h e des.h.
 #            Nenhum dos quatro esta' em ../, e o pacote Malardalen daqui nao
 #            os traz.
+#
+# Nao tem ponto de entrada:
+#
 #   sqrt.c   nao tem main. Define so' sqrtfcn e fabs, e' arquivo de biblioteca.
 #            Medi-lo exigiria escrever um driver, que seria codigo NOSSO dentro
 #            da regiao medida.
 #
-# Corrigir as duas primeiras seria editar fonte Malardalen, o que esta' fora da
-# regra deste diretorio. Elas ficam documentadas aqui e no RELATORIO.md.
+# Escrevem fora dos limites e CORROMPEM O MEDIDOR:
+#
+#   select.c      ambos declaram `float arr[20]` e vem de codigo Numerical
+#   qsort-exam.c  Recipes, que numera vetores a partir de 1. Com `l=1; ir=n;` e
+#                 n=20 eles acessam arr[20], uma posicao alem do fim, e o SWAP
+#                 ESCREVE la'. No binario ligado, os 4 bytes em arr[20] sao o
+#                 `perf_fd` do harness, o descritor do contador de ciclos. O
+#                 benchmark grava um float por cima dele, todo read() seguinte
+#                 falha, e a medicao morre na primeira execucao.
+#
+#                 Nao e' so' um problema de instrumento. O caminho que esses
+#                 dois programas percorrem depende do valor lido em arr[20],
+#                 que e' o que a ligacao tiver posto ali. Muda a ordem dos
+#                 objetos, muda o tempo. O tempo de execucao deles nao e'
+#                 propriedade do algoritmo, e por isso nao ha' o que reportar.
+#
+#                 Varredura com AddressSanitizer nos 34 candidatos: sao os
+#                 unicos dois com acesso fora de limites.
+#
+# Corrigir qualquer uma das cinco seria editar fonte Malardalen, o que esta'
+# fora da regra deste diretorio. Ficam documentadas aqui e no RELATORIO.md.
 BENCHES := adpcm bs bsort100 cnt compress cover crc duff edn expint \
            fac fdct fft1 fibcall fir insertsort janne_complex jfdctint \
            lcdnum lms ludcmp matmult minver ndes ns nsichneu prime \
-           qsort-exam qurt recursion select statemate ud whet
+           qurt recursion statemate ud whet
 SRCDIR  := ..
 # Atribuicao simples, e nao ?=, porque o make ja' vem com CC=cc predefinido e
 # um ?= nunca teria efeito. Passar CC=... na linha de comando continua valendo.
@@ -183,7 +206,7 @@ bin_wcet/%: obj/%.o obj/measure_%.o | bin_wcet
 	$(CXX) -o $@ $^ -lm
 
 # ---------------------------------------------------------------------------
-# A bateria completa: roda os 34 e junta numa tabela.
+# A bateria completa: roda os 32 e junta numa tabela.
 #
 #   sudo make medir            n=5 (o numero do paper), 1 aquecimento
 #   sudo make medir N=100 W=5  mais amostras e mais aquecimento

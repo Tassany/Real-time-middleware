@@ -480,12 +480,43 @@ static bool perf_abrir()
 	return true;
 }
 
+/* Levantada quando uma leitura do contador falha no meio do lote, e nunca
+ * abaixada. Ver o comentario de perf_ler(). */
+static bool perf_quebrou = false;
+static int  perf_erro    = 0;
+
+/*
+ * ATENCAO ao valor de retorno em caso de falha.
+ *
+ * Esta funcao ja' devolveu 0 em silencio quando o read() falhava, e isso custou
+ * caro. As amostras sao formadas por `c1 - c0` em aritmetica sem sinal, entao
+ * uma leitura final que devolve 0 vira `0 - c0`, que nao da' um numero negativo
+ * e sim um numero perto de 2^64. Uma vez que as DUAS leituras passam a falhar,
+ * a amostra vira `0 - 0`, ou seja zero, e a mediana de um lote inteiro sai
+ * zero. Descontado o piso do instrumento, o CSV recebia um discreto `-235`, com
+ * cara de medida ruim mas plausivel, quando na verdade nao havia medida
+ * nenhuma.
+ *
+ * Isso aconteceu de verdade, com o select.c e o qsort-exam.c, que escrevem uma
+ * posicao alem do fim de um vetor global e acertam em cheio o `perf_fd` logo
+ * adiante. O descritor virava lixo e todo read() seguinte falhava.
+ *
+ * Um instrumento pode falhar. O que ele nao pode e' falhar parecendo que
+ * mediu. A funcao continua devolvendo 0, porque precisa devolver alguma coisa,
+ * mas agora levanta uma bandeira que o main() confere antes de reportar
+ * qualquer estatistica de ciclos.
+ */
 static inline uint64_t perf_ler()
 {
 	uint64_t v = 0;
 
-	if (read(perf_fd, &v, sizeof(v)) != (ssize_t)sizeof(v))
+	if (read(perf_fd, &v, sizeof(v)) != (ssize_t)sizeof(v)) {
+		if (!perf_quebrou) {
+			perf_quebrou = true;
+			perf_erro = errno;
+		}
 		return 0;
+	}
 	return v;
 }
 
@@ -1015,6 +1046,27 @@ int main(int argc, char **argv)
 		? (double)ordenadas[n / 2]
 		: ((double)ordenadas[n / 2 - 1] + (double)ordenadas[n / 2]) / 2.0;
 
+	/* Se o contador quebrou no meio do lote, nao existe estatistica de ciclos
+	 * para calcular. As colunas saem VAZIAS no CSV, pela mesma razao que ja'
+	 * saem vazias quando nao ha' fonte de ciclos nenhuma: coluna vazia e' um
+	 * buraco visivel, e numero errado nao e'. As colunas do generic timer
+	 * sobrevivem, porque o relogio nao depende de descritor de arquivo. */
+	if (perf_quebrou) {
+		pmu_ok = false;
+		fprintf(stderr,
+			"\n[%s] >>> O CONTADOR DE CICLOS QUEBROU DURANTE O LOTE <<<\n"
+			"      read(perf_fd) falhou: %s\n"
+			"\n"
+			"      A causa quase certa e' o proprio benchmark escrever fora\n"
+			"      dos limites de um vetor e acertar o descritor de arquivo\n"
+			"      do contador, que fica na memoria logo depois. Foi o que\n"
+			"      o select.c e o qsort-exam.c fazem.\n"
+			"\n"
+			"      As colunas de ciclos deste benchmark saem vazias. As de\n"
+			"      tempo continuam validas. Saida com codigo 3.\n\n",
+			BENCH_NAME, strerror(perf_erro));
+	}
+
 	/* As mesmas quatro estatisticas sobre os ciclos medidos. */
 	uint64_t *ord_pmu = new uint64_t[n];
 	double media_pmu = 0.0, mediana_pmu = 0.0;
@@ -1460,5 +1512,8 @@ int main(int argc, char **argv)
 	delete[] ciclos_medidos;
 	delete[] ordenadas;
 	delete[] amostras;
-	return 0;
+
+	/* 3 e nao 0, para que um lote inteiro rodando dentro de um `for` do shell
+	 * deixe rastro em vez de passar despercebido. */
+	return perf_quebrou ? 3 : 0;
 }
