@@ -18,8 +18,10 @@
 # ---------------------------------------------------------------------------
 ARCH := $(shell uname -m)
 ifneq ($(ARCH),aarch64)
-$(error Este tutorial e' AArch64 (Raspberry Pi 5). Aqui uname -m diz '$(ARCH)'. \
-Copie o diretorio wcet_bench inteiro para a Pi e compile la')
+$(error Este tutorial e' AArch64 (Raspberry Pi 5 ou Pi 4 com sistema de 64 \
+bits). Aqui uname -m diz '$(ARCH)'. Numa Pi 4 com Raspberry Pi OS de 32 bits \
+isto diria 'armv7l' e tambem nao serve. Copie o diretorio wcet_bench inteiro \
+para a placa e compile la')
 endif
 
 CXX      ?= g++
@@ -60,7 +62,24 @@ etapa4: etapa4.cpp
 #
 # As fontes em ../ nunca sao modificadas. Toda a adaptacao esta' nas flags.
 # ---------------------------------------------------------------------------
-BENCHES := bsort100 crc fft1 matmult ud statemate
+# As 34 fontes Malardalen que sao medives. Sao as 37 de ../ menos tres, que
+# ficam de fora por defeito da propria fonte e nao do harness:
+#
+#   st.c     tem um `*/` orfao na linha 9, sobra de uma edicao de cabecalho.
+#            Nao compila.
+#   des.c    faz `#include <config.h>` e mais types.h, errors.h e des.h.
+#            Nenhum dos quatro esta' em ../, e o pacote Malardalen daqui nao
+#            os traz.
+#   sqrt.c   nao tem main. Define so' sqrtfcn e fabs, e' arquivo de biblioteca.
+#            Medi-lo exigiria escrever um driver, que seria codigo NOSSO dentro
+#            da regiao medida.
+#
+# Corrigir as duas primeiras seria editar fonte Malardalen, o que esta' fora da
+# regra deste diretorio. Elas ficam documentadas aqui e no RELATORIO.md.
+BENCHES := adpcm bs bsort100 cnt compress cover crc duff edn expint \
+           fac fdct fft1 fibcall fir insertsort janne_complex jfdctint \
+           lcdnum lms ludcmp matmult minver ndes ns nsichneu prime \
+           qsort-exam qurt recursion select statemate ud whet
 SRCDIR  := ..
 # Atribuicao simples, e nao ?=, porque o make ja' vem com CC=cc predefinido e
 # um ?= nunca teria efeito. Passar CC=... na linha de comando continua valendo.
@@ -106,20 +125,26 @@ DEFS_matmult  := -DUPPSALAWCET
 #                         herdado de um ambiente sem sistema operacional. Num
 #                         processo Linux isso e' SIGSEGV. O harness mapeia a
 #                         pagina antes de rodar. Ver o comentario em etapa5.cpp.
-HDEFS_bsort100 := -DMAPEAR_ENDERECO_FIXO
+#   DEFINIR_IN            recursion.c declara `extern volatile int In;` e escreve
+#                         `In = fib(10)` no fim do main, sem que ninguem defina
+#                         In. E' o sumidouro que impede o resultado de ser
+#                         descartado, e quem tem que fornece-lo e' o harness.
+#                         Sem isto o link falha com "undefined reference to In".
+HDEFS_bsort100  := -DMAPEAR_ENDERECO_FIXO
+HDEFS_recursion := -DDEFINIR_IN
 
 BINS5 := $(addprefix bin5/,$(BENCHES))
 BINS6 := $(addprefix bin6/,$(BENCHES))
 BINS7 := $(addprefix bin7/,$(BENCHES))
-BINS8 := $(addprefix bin8/,$(BENCHES))
+BINSW := $(addprefix bin_wcet/,$(BENCHES))
 
-.PHONY: etapa5 etapa6 etapa7 etapa8
+.PHONY: etapa5 etapa6 etapa7 measure_wcet
 etapa5: $(BINS5)
 etapa6: $(BINS6)
 etapa7: $(BINS7)
-etapa8: $(BINS8)
+measure_wcet: $(BINSW)
 
-bin5 bin6 bin7 bin8 obj:
+bin5 bin6 bin7 bin_wcet obj:
 	@mkdir -p $@
 
 # O objeto da fonte Malardalen e' o mesmo para as duas etapas: quem muda e' o
@@ -136,14 +161,14 @@ obj/arn6_%.o: etapa6.cpp | obj
 obj/arn7_%.o: etapa7.cpp | obj
 	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
 
-obj/arn8_%.o: etapa8.cpp | obj
+obj/measure_%.o: measure_wcet.cpp | obj
 	$(CXX) $(CXXFLAGS) -DBENCH_NAME='"$*"' $(HDEFS_$*) -c -o $@ $<
 
 .SECONDARY: $(addprefix obj/,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn5_,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn6_,$(addsuffix .o,$(BENCHES))) \
             $(addprefix obj/arn7_,$(addsuffix .o,$(BENCHES))) \
-            $(addprefix obj/arn8_,$(addsuffix .o,$(BENCHES)))
+            $(addprefix obj/measure_,$(addsuffix .o,$(BENCHES)))
 
 bin5/%: obj/%.o obj/arn5_%.o | bin5
 	$(CXX) -o $@ $^ -lm
@@ -154,11 +179,11 @@ bin6/%: obj/%.o obj/arn6_%.o | bin6
 bin7/%: obj/%.o obj/arn7_%.o | bin7
 	$(CXX) -o $@ $^ -lm
 
-bin8/%: obj/%.o obj/arn8_%.o | bin8
+bin_wcet/%: obj/%.o obj/measure_%.o | bin_wcet
 	$(CXX) -o $@ $^ -lm
 
 # ---------------------------------------------------------------------------
-# A bateria completa: roda os seis e junta numa tabela.
+# A bateria completa: roda os 34 e junta numa tabela.
 #
 #   sudo make medir            n=5 (o numero do paper), 1 aquecimento
 #   sudo make medir N=100 W=5  mais amostras e mais aquecimento
@@ -180,7 +205,7 @@ medir: $(BINS7)
 
 # A mesma bateria com o contador de ciclos real:
 #
-#   sudo make medir8 N=100 W=5
+#   sudo make medir_wcet N=100 W=5
 #
 # Os binarios escolhem sozinhos como chegar no contador, e dizem qual usaram na
 # coluna `fonte_ciclos` do CSV:
@@ -192,16 +217,16 @@ medir: $(BINS7)
 #
 # Sem nenhuma das duas os binarios ainda rodam e preenchem so' as colunas da
 # etapa 7. O sudo continua valendo por causa do SCHED_FIFO e do mlockall.
-CSV8 ?= resultados_pmu.csv
+CSVW ?= resultados_pmu.csv
 
-.PHONY: medir8
-medir8: $(BINS8)
-	@./bin8/$(firstword $(BENCHES)) --header > $(CSV8)
-	@for b in $(BENCHES); do ./bin8/$$b -n $(N) -w $(W) >> $(CSV8); done
+.PHONY: medir_wcet
+medir_wcet: $(BINSW)
+	@./bin_wcet/$(firstword $(BENCHES)) --header > $(CSVW)
+	@for b in $(BENCHES); do ./bin_wcet/$$b -n $(N) -w $(W) >> $(CSVW); done
 	@echo
-	@echo "==> $(CSV8)"
-	@column -s, -t $(CSV8) 2>/dev/null || cat $(CSV8)
+	@echo "==> $(CSVW)"
+	@column -s, -t $(CSVW) 2>/dev/null || cat $(CSVW)
 
 clean:
-	rm -f $(ETAPAS) $(CSV) $(CSV8)
-	rm -rf bin bin5 bin6 bin7 bin8 obj
+	rm -f $(ETAPAS) $(CSV) $(CSVW)
+	rm -rf bin bin5 bin6 bin7 bin_wcet obj

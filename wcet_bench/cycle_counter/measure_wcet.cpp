@@ -1,11 +1,15 @@
 /*
- * etapa8.cpp — ciclos medidos de verdade, por dois caminhos.
+ * measure_wcet.cpp — ciclos medidos de verdade, por dois caminhos.
+ *
+ * Este e' o programa com que as medicoes de WCET observado sao feitas. Ele
+ * nasceu como a etapa 8 do tutorial deste diretorio, e as etapas 1 a 7
+ * continuam ao lado explicando, uma decisao por vez, por que ele e' assim.
  *
  * A etapa 7 fechou com um problema que ela nao podia resolver: quatro dos seis
  * benchmarks medem entre 12 e 46 ticks, e um tick vale 44 ciclos de nucleo. A
  * regua e' grossa demais.
  *
- * Esta etapa troca a regua. O contador de ciclos da PMU conta CICLOS DE NUCLEO,
+ * Aqui a regua muda. O contador de ciclos da PMU conta CICLOS DE NUCLEO,
  * um a um, o que da' 44 vezes mais resolucao e mede diretamente a grandeza que
  * o paper reporta, em vez de deriva-la de uma medicao de tempo.
  *
@@ -24,7 +28,7 @@
  * O programa escolhe sozinho, na ordem acima, e diz qual usou. Se nenhuma
  * estiver disponivel ele ainda roda, reportando as colunas da etapa 7.
  *
- * O QUE ESTA ETAPA MEDE, e e' o ponto:
+ * O QUE ELE MEDE, e e' o ponto:
  *
  * Os dois contadores sao lidos na MESMA janela, com uma unica barreira. Assim
  * cada execucao produz um par: quantos ticks de generic timer e quantos ciclos
@@ -39,9 +43,9 @@
  * negativo. O `-c` da etapa 6 deixa de ser refinamento e passa a ser requisito.
  * O programa verifica em que nucleo terminou e reclama se nao for o pedido.
  *
- * Um binario por benchmark:  bin8/bsort100, bin8/crc, ...
+ * Um binario por benchmark:  bin_wcet/bsort100, bin_wcet/crc, ...
  *
- * Uso:  ./bin8/<nome> [-n EXEC] [-w AQUECIMENTOS] [-c NUCLEO] [--header]
+ * Uso:  ./bin_wcet/<nome> [-n EXEC] [-w AQUECIMENTOS] [-c NUCLEO] [--header]
  *
  * ---------------------------------------------------------------------------
  * O que segue abaixo veio da etapa 7 e continua valendo.
@@ -245,6 +249,38 @@ static void mapear_endereco_fixo()
 
 #else
 static void mapear_endereco_fixo() { }
+#endif
+
+/* ================================================================== */
+/* recursion: um simbolo que a fonte usa e nao define                 */
+/* ================================================================== */
+/*
+ * recursion.c termina assim:
+ *
+ *     extern volatile int In;
+ *
+ *     void main(void)
+ *     {
+ *       In = fib(10);
+ *     }
+ *
+ * A fonte DECLARA `In` e nunca o define. Isso e' proposital: `In` e' o
+ * sumidouro do resultado. Sem ele o compilador poderia concluir que fib(10) nao
+ * e' observavel e apagar a chamada inteira, que e' o defeito 3 da etapa 3. Com
+ * `volatile` e com a escrita num objeto externo, a chamada tem que acontecer.
+ *
+ * Quem define o simbolo e' quem linka, ou seja nos. Nao ha' nada de arbitrario
+ * no valor inicial, porque a fonte so' ESCREVE em `In` e nunca le'. O que
+ * importa e' que o objeto exista e seja volatile, para que a escrita nao seja
+ * otimizada.
+ *
+ * Isto fica FORA da regiao medida. O custo dentro da medicao e' o de uma
+ * escrita em memoria, que ja' pertence ao benchmark e nao ao harness.
+ */
+#ifdef DEFINIR_IN
+extern "C" {
+volatile int In = 0;
+}
 #endif
 
 /* ------------------------------------------- instrumento (vem da etapa 3) */
@@ -743,6 +779,8 @@ static void uso(const char *prog)
 		"  -w AQUECIMENTOS   execucoes descartadas antes (padrao 1)\n"
 		"  -c NUCLEO         nucleo onde prender a thread (padrao 3)\n"
 		"  --header          imprime so' o cabecalho do CSV e sai\n"
+		"  --amostras        despeja as n amostras cruas, uma por linha, em\n"
+		"                    stderr, sem o corte de 20 do relatorio\n"
 		"\n"
 		"stdout leva uma linha de CSV; o relatorio legivel vai para stderr.\n"
 		"Rode com sudo para conseguir SCHED_FIFO e mlockall.\n", prog);
@@ -814,6 +852,7 @@ int main(int argc, char **argv)
 	int n = 5;
 	int aquecimentos = 1;
 	int nucleo = 3;
+	bool despejar_amostras = false;
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--header")) {
@@ -825,6 +864,8 @@ int main(int argc, char **argv)
 			aquecimentos = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-c") && i + 1 < argc) {
 			nucleo = atoi(argv[++i]);
+		} else if (!strcmp(argv[i], "--amostras")) {
+			despejar_amostras = true;
 		} else {
 			uso(argv[0]);
 			return 2;
@@ -1114,7 +1155,7 @@ int main(int argc, char **argv)
 	/* CANAL 2: stderr, o relatorio legivel                             */
 	/* ================================================================ */
 
-	fprintf(stderr, "etapa8 — benchmark \"%s\"\n", BENCH_NAME);
+	fprintf(stderr, "measure_wcet — benchmark \"%s\"\n", BENCH_NAME);
 	fprintf(stderr, "  %d execucoes medidas, %d de aquecimento\n",
 		n, aquecimentos);
 	fprintf(stderr, "  CNTFRQ_EL0 = %.3f MHz (%.2f ns/tick)\n\n",
@@ -1149,13 +1190,39 @@ int main(int argc, char **argv)
 			"/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\n");
 	fprintf(stderr, "\n");
 
-	fprintf(stderr, "AMOSTRAS\n");
-	for (int i = 0; i < n && i < 20; i++)
-		fprintf(stderr, "  execucao %2d   %10llu ticks   %10.4f us\n",
-			i + 1, (unsigned long long)amostras[i],
-			amostras[i] * us_por_tick);
-	if (n > 20)
-		fprintf(stderr, "  ... (%d amostras restantes omitidas)\n", n - 20);
+	/* Duas formas de mostrar as amostras.
+	 *
+	 * A padrao corta em 20, porque o relatorio de tela existe para dizer se a
+	 * medicao correu bem, e vinte linhas bastam para isso.
+	 *
+	 * O --amostras despeja as n, numa forma que awk e gnuplot leem direto. Ele
+	 * existe porque a MEDIA E A MEDIANA NAO DISTINGUEM duas coisas muito
+	 * diferentes: um benchmark que sempre custa o mesmo, e um cujo custo MUDA
+	 * ao longo do lote porque a chamada anterior deixou estado para tras. O
+	 * crc da secao 5.4 e o fft1 sao os casos ja' conhecidos. Com a serie na
+	 * ordem em que foi medida da' para ver a diferenca, e sem ela o numero da
+	 * tabela e' uma media sobre dois regimes distintos, que nao descreve
+	 * nenhum dos dois. */
+	if (despejar_amostras) {
+		fprintf(stderr, "# amostras de %s, na ordem em que foram medidas\n",
+			BENCH_NAME);
+		fprintf(stderr, "# execucao ticks us ciclos_pmu\n");
+		for (int i = 0; i < n; i++)
+			fprintf(stderr, "%d %llu %.4f %llu\n",
+				i + 1,
+				(unsigned long long)amostras[i],
+				amostras[i] * us_por_tick,
+				(unsigned long long)(pmu_ok ? ciclos_medidos[i] : 0));
+	} else {
+		fprintf(stderr, "AMOSTRAS\n");
+		for (int i = 0; i < n && i < 20; i++)
+			fprintf(stderr, "  execucao %2d   %10llu ticks   %10.4f us\n",
+				i + 1, (unsigned long long)amostras[i],
+				amostras[i] * us_por_tick);
+		if (n > 20)
+			fprintf(stderr, "  ... (%d amostras restantes omitidas)\n",
+				n - 20);
+	}
 	fprintf(stderr, "\n");
 
 	/* As tres colunas lado a lado, de proposito. A conversao fica auditavel:

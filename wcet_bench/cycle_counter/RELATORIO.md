@@ -443,7 +443,10 @@ O nível de otimização, ausente do texto, conforme a seção 6.4.
    já que analisadores estáticos supõem cache vazia na entrada do programa.
 3. O `crc` é medido em regime permanente, sem a construção da tabela.
 4. As interrupções do sistema operacional não foram eliminadas, apenas
-   reduzidas. Falta isolamento no boot com `isolcpus` e `nohz_full`.
+   reduzidas. Falta isolamento no arranque com `isolcpus` e `nohz_full`, cujo
+   procedimento está documentado na seção 9.2 mas não foi aplicado nas medições
+   da seção 4. Afeta a coluna de ticks e a estatística de máximo, não a coluna
+   de ciclos, que já exclui o kernel da contagem.
 5. Resolvida na etapa 8. Os ciclos passaram a ser medidos, e a derivação da
    etapa 7 ficou validada contra eles.
 6. O `exclude_kernel` exclui as interrupções da contagem. Os números da seção 4
@@ -457,7 +460,7 @@ desempenho. Ele tica na frequência do núcleo, o que dá 44 vezes mais resoluç
 que o generic timer e mede diretamente a grandeza que o paper reporta, em vez de
 derivá-la de uma medição de tempo.
 
-Há dois caminhos para o mesmo contador, e o `etapa8.cpp` escolhe sozinho.
+Há dois caminhos para o mesmo contador, e o `measure_wcet.cpp` escolhe sozinho.
 
 O primeiro é `mrs pmccntr_el0`, uma instrução, o mais barato possível. Ele exige
 um módulo de kernel que escreva `PMUSERENR_EL0`, porque o acesso a partir de EL0
@@ -496,6 +499,97 @@ direta nos seis benchmarks.
 
 ## 9. Como reproduzir
 
+### 9.1 O que o programa já garante sozinho
+
+Antes de medir qualquer coisa, o `measure_wcet.cpp` faz quatro coisas.
+
+Prende a thread num núcleo só, com `sched_setaffinity`. Isso é obrigatório e
+não é refinamento, porque o contador de ciclos é separado em cada núcleo e os
+quatro não estão sincronizados entre si. Se o programa pulasse de núcleo entre a
+leitura inicial e a final, a diferença entre as duas seria lixo, possivelmente
+negativo. O programa confere em que núcleo terminou e reclama se não for o
+pedido.
+
+Sobe a prioridade para `SCHED_FIFO` 80, que é uma promessa do sistema
+operacional de não interromper este programa para dar vez a outro de prioridade
+normal.
+
+Trava a memória na RAM com `mlockall`, para que o sistema não mova nenhuma
+página para o disco no meio do lote.
+
+Lê o governor e a frequência do núcleo antes e depois, e deixa a coluna de
+ciclos vazia se a frequência mudou durante o lote.
+
+As quatro juntas viram a coluna `isolamento_completo` do CSV. Ela vale 1 quando
+todas deram certo, e uma linha com 0 ali não deve ser reportada.
+
+### 9.2 O que ainda falta, e é opcional
+
+A afinidade coloca o programa no núcleo 3, mas não impede o sistema operacional
+de colocar outras coisas lá também. A diferença é a de sentar numa mesa vazia do
+restaurante contra reservar a mesa. Enquanto ninguém mais chega, as duas
+situações são idênticas, e quando alguém chega só a segunda protege.
+
+Reservar o núcleo de verdade é feito no arranque da placa, não pelo programa.
+São três instruções passadas ao kernel.
+
+`isolcpus=3` tira o núcleo 3 da lista de núcleos onde o escalonador pode pôr
+trabalho. Só vai para lá quem pedir explicitamente, que é o nosso caso.
+
+`nohz_full=3` desliga a interrupção periódica de relógio naquele núcleo enquanto
+houver uma única tarefa rodando. Sem isso o núcleo é interrompido centenas de
+vezes por segundo mesmo sem ter nada para fazer.
+
+`rcu_nocbs=3` move para outros núcleos um trabalho de faxina interna do kernel
+que normalmente cai em todos.
+
+Na Pi 5 e na Pi 4 o procedimento é o mesmo. Acrescente as três ao arquivo
+`/boot/firmware/cmdline.txt`, que **precisa continuar sendo uma única linha**.
+Quebrar essa linha em duas é o erro clássico, e a placa não arranca depois dele.
+Em sistemas mais antigos que o Raspberry Pi OS Bookworm o arquivo fica em
+`/boot/cmdline.txt`.
+
+```sh
+sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
+# edite e acrescente, na mesma linha:  isolcpus=3 nohz_full=3 rcu_nocbs=3
+sudo reboot
+```
+
+Depois do arranque, confira se as três pegaram de verdade. Elas dependem de
+opções de compilação do kernel, e um kernel sem `CONFIG_NO_HZ_FULL` aceita o
+`nohz_full=3` em silêncio e não faz nada com ele.
+
+```sh
+cat /proc/cmdline                       # as tres devem aparecer aqui
+dmesg | grep -i "dynticks\|isolat"      # confirma que o kernel obedeceu
+```
+
+Falta ainda afastar as interrupções de hardware do núcleo reservado.
+
+```sh
+for f in /proc/irq/*/smp_affinity_list; do echo 0-2 | sudo tee "$f"; done 2>/dev/null
+```
+
+Boa parte delas vai recusar a escrita, e isso é esperado. Interrupções presas a
+um núcleo específico por construção do hardware não podem ser movidas. O que o
+laço faz é mover as que podem.
+
+**Quanto isso muda os números.** Menos do que parece, e vale saber disso antes
+de mexer no arranque de uma placa que funciona. A contagem de ciclos usa
+`exclude_kernel=1`, que já faz a PMU parar de contar enquanto a CPU está
+atendendo interrupção. As interrupções portanto já estão fora da coluna de
+ciclos, que é a coluna reportada. O que o isolamento no arranque melhora é a
+coluna de ticks e a estatística de máximo, onde a seção 5.3 mostrou que as
+excursões eram tempo de sistema operacional e não variação do programa.
+
+O custo é que a placa fica com três núcleos utilizáveis em vez de quatro, e
+compilar nela passa a ser mais lento.
+
+Se o lote for rodado sem esse isolamento, o que é uma escolha legítima, o
+relatório precisa dizer isso, e não deixar implícito.
+
+### 9.3 O lote
+
 Na placa, dentro de `wcet_bench/cycle_counter/`.
 
 ```sh
@@ -504,11 +598,16 @@ echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governo
 # etapa 7, generic timer, ciclos derivados
 sudo make medir  N=100 W=5 CSV=resultados_n100.csv
 
-# etapa 8, ciclos medidos. Gera a tabela da secao 4.
-sudo make medir8 N=100 W=5 CSV8=resultados_pmu.csv
+# ciclos medidos pela PMU. Gera a tabela da secao 4.
+sudo make medir_wcet N=100 W=5 CSVW=resultados_pmu.csv
 ```
 
-O `medir8` escolhe sozinho como chegar no contador de ciclos e registra a
+O `echo performance` é o que trava a velocidade do processador. Sem ele o
+governor age como um câmbio automático, acelerando e desacelerando durante o
+lote, e a seção 5.7 mostra que isso sozinho vale um fator 1,6 entre duas rodadas
+do mesmo benchmark.
+
+O `medir_wcet` escolhe sozinho como chegar no contador de ciclos e registra a
 escolha na coluna `fonte_ciclos`. Nesta placa ela sai como `perf`. Se o módulo
 de `etapa8_pmu/` estiver carregado, sai como `mrs` e a leitura fica mais barata,
 sem mudar os valores.

@@ -59,7 +59,7 @@
  *   PMUSERENR_EL0          EN (bit 0) mais CR (bit 2), que juntos liberam a
  *                          leitura a partir de EL0. E' a escrita que so' o
  *                          kernel pode fazer, e a razao de este arquivo ser um
- *                          modulo e nao mais uma funcao no etapa8.cpp.
+ *                          modulo e nao mais uma funcao no measure_wcet.cpp.
  *
  * on_each_cpu() executa a funcao em todos os nucleos online, porque cada um tem
  * seu proprio conjunto desses registradores. Escrever so' no nucleo onde o
