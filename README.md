@@ -1,19 +1,6 @@
 # Real-time-middleware
 
-A C++17 reimplementation of **MCFlow**, a real-time middleware that runs
-dependent task graphs on multi-core platforms, extended with two things the
-original paper does not provide: configurable bin-packing allocation of
-subtasks to cores, and a measurement harness that reports per-job scheduling
-latency, jitter and deadline misses under `SCHED_FIFO` on Linux `PREEMPT_RT`.
-
-A deployment plan is a JSON file describing tasks, their subtasks, periods,
-priorities and connections. The middleware parses it, assigns each subtask to a
-core (either as written in the plan, or automatically through a bin-packing
-heuristic), builds one dispatcher thread per core, and runs the graph.
-
-Reference paper: Huang-Ming Huang, Christopher Gill, Chenyang Lu. *MCFlow: a
-Real-time Multi-core Aware Middleware for Dependent Task Graphs.* IEEE RTCSA
-2012. The paper itself is not redistributed here; see `NOTICE.md`.
+This repository is a C++ implementation of a real-time soft scheduler. 
 
 ## Requirements
 
@@ -31,16 +18,12 @@ The only C++ dependency, `nlohmann/json` v3.12.0, is vendored in
 ## Build and test
 
 ```bash
-make examples
+make harness
 ```
 
-```bash
-make test
-```
-
-`make test` builds and runs the six suites covering phases 0 to 5 (parser, DAG,
-ring buffer, component model, dispatcher, team manager): 35 assertions, all of
-which pass without root.
+Builds the three programs the experiments are run with: `allocate`,
+`execute_plan` and `evaluation`, whose sources live in `scripts/`
+alongside the Python tooling. 
 
 ```bash
 make clean
@@ -51,19 +34,19 @@ make clean
 Inspect how a plan maps its subtasks onto cores, without running anything:
 
 ```bash
-make show_alloc && ./show_alloc plans/deployment_plan_sat.json
+make allocate && ./allocate plans/deployment_plan_sat.json
 ```
 
 Run the pipeline described by a plan:
 
 ```bash
-sudo ./example_from_plan plans/deployment_plan.json 4
+sudo ./execute_plan plans/deployment_plan.json 4
 ```
 
 Measure scheduling latency, jitter and deadline misses over 50 hyperperiods:
 
 ```bash
-sudo ./example_eval plans/deployment_plan_lowsat.json 50
+sudo ./evaluation plans/deployment_plan_lowsat.json 50
 ```
 
 The full set of experiments, including the ones that produced the tables in the
@@ -75,20 +58,10 @@ article, is in **[EXPERIMENTS.md](EXPERIMENTS.md)**.
 |---|---|
 | `src/` | the middleware itself: `dispatcher.hpp`, `team_manager.*`, `ring_buffer.hpp`, `component.hpp`, `dag.*`, `allocator.hpp`, `parser_json.*` |
 | `plans/` | deployment plans, from 18 to 189 subtasks |
-| `examples/` | runnable programs, including the `example_eval` measurement harness |
-| `tests/` | the six test suites run by `make test` |
-| `scripts/` | Python tooling: plotting, random plan generation, saturation sweep |
-| `wcet_bench/` | Malardalen WCET benchmarks used as subtask bodies, the cycle-counter study that measured their WCETs, and the code generator of phase 6 (`tools/codegen.cpp`, work in progress) |
+| `examples/` | small demo programs, one per building block |
+| `scripts/` | the tools the experiments are run with: `allocate`, `execute_plan` and `evaluation` in C++, plus plotting, random plan generation and the saturation sweep in Python |
+| `wcet_bench/` | Malardalen WCET benchmarks used as subtask bodies, the cycle-counter study that measured their WCETs. |
 | `results/` | measurement data behind the article's tables, with its own README documenting provenance |
-| `docs/` | architecture, design notes, conformance analysis against the paper |
-
-## Documentation
-
-- [docs/visao-arquitetural.md](docs/visao-arquitetural.md) — architectural overview
-- [docs/layers-deep-dive.md](docs/layers-deep-dive.md) — configuration, scheduling and orchestration layers in detail
-- [docs/dispatcher.md](docs/dispatcher.md), [docs/team_manager.md](docs/team_manager.md) — the two core components
-- [docs/conformidade-huang2012.md](docs/conformidade-huang2012.md) — where this implementation departs from the paper
-- [docs/report_eval_rpi5.md](docs/report_eval_rpi5.md) — evaluation report on Raspberry Pi 5
 
 ## Citing
 

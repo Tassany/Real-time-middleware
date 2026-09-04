@@ -328,7 +328,7 @@ void TeamManager::notify(int subtask_id) {
 ```
 
 `notify()` é a única interface pública de ativação durante a execução. O tick loop externo
-(em `example_eval.cpp`) chama `tm.notify(source_id)` a cada período para disparar as fontes.
+(em `evaluation.cpp`) chama `tm.notify(source_id)` a cada período para disparar as fontes.
 O `TeamManager` repassa para o `Dispatcher` do subtask via `subtask_dispatcher_`, que executa o
 protocolo de fan-in e, se completo, enfileira o subtask.
 
@@ -396,7 +396,7 @@ O código da aplicação itera sobre `plan.tasks` e `plan.subtasks` para criar o
 `SubtaskEntry`s.
 
 ```cpp
-// Padrão de uso em example_eval.cpp:
+// Padrão de uso em evaluation.cpp:
 std::vector<TeamManager::SubtaskEntry> entries;
 for (auto& task : plan.tasks)
     for (auto& info : task.subtasks)
@@ -452,7 +452,7 @@ std::size_t n = tm.ring_buffer_size(1, 4);  // edge subtask 1 → subtask 4
 
 ## 13. O padrão de dois passos na aplicação
 
-Um detalhe importante de `example_eval.cpp` (e de qualquer uso correto do `TeamManager`):
+Um detalhe importante de `evaluation.cpp` (e de qualquer uso correto do `TeamManager`):
 os objetos `Subtask` são alocados **antes** de atribuir os lambdas de `execute()`.
 
 ```cpp

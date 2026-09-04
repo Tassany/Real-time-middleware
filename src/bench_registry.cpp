@@ -9,13 +9,22 @@
 // ---------------------------------------------------------------------------
 //  Entry points
 //
-//  The six sources do not agree on a signature: matmult.c, ud.c and fft1.c
-//  declare `void main()`, crc.c and statemate.c declare `int main(void)`, and
-//  bsort100.c uses the K&R `main()` with an implicit int. Each one is therefore
-//  declared with its own return type and wrapped in a uniform void() thunk;
-//  calling a void-returning function through an int(*)() pointer would be
-//  undefined behaviour.
+//  The 32 sources do not agree on a signature: some declare `void main()`,
+//  others `int main(void)` (or a variant), and a few use the K&R `main()`
+//  with an implicit int. Each one is therefore declared with its own return
+//  type and wrapped in a uniform void() thunk; calling a void-returning
+//  function through an int(*)() pointer would be undefined behaviour.
 // ---------------------------------------------------------------------------
+
+// recursion.c declares `extern volatile int In;` and writes to it
+// (`In = fib(10);`) but never defines it — deliberate upstream, so the
+// compiler can't dead-code-eliminate the call. Whoever links recursion.o has
+// to supply the symbol; wcet_bench/cycle_counter/measure_wcet.cpp does the
+// same thing under -DDEFINIR_IN. Must be defined exactly once in the binary.
+extern "C" {
+volatile int In = 0;
+}
+
 extern "C" {
 void bench_entry_matmult(void);
 void bench_entry_ud(void);
@@ -23,6 +32,38 @@ void bench_entry_fft1(void);
 int  bench_entry_crc(void);
 int  bench_entry_statemate(void);
 int  bench_entry_bsort100(void);
+
+// -- int main(...) ----------------------------------------------------------
+int bench_entry_adpcm(void);
+int bench_entry_cnt(void);
+int bench_entry_compress(void);
+int bench_entry_cover(void);
+int bench_entry_edn(void);
+int bench_entry_fac(void);
+int bench_entry_fdct(void);
+int bench_entry_fibcall(void);
+int bench_entry_fir(void);
+int bench_entry_insertsort(void);
+int bench_entry_janne_complex(void);
+int bench_entry_lcdnum(void);
+int bench_entry_lms(void);
+int bench_entry_ludcmp(void);
+int bench_entry_minver(void);
+int bench_entry_ndes(void);
+int bench_entry_nsichneu(void);
+int bench_entry_prime(void);
+int bench_entry_qurt(void);
+
+// -- void main(void) ----------------------------------------------------------
+void bench_entry_duff(void);
+void bench_entry_expint(void);
+void bench_entry_jfdctint(void);
+void bench_entry_ns(void);
+void bench_entry_recursion(void);
+
+// -- implicit-int main() (K&R) ----------------------------------------------
+int bench_entry_bs(void);
+int bench_entry_whet(void);
 }
 
 namespace {
@@ -34,6 +75,35 @@ void call_crc()       { (void)bench_entry_crc(); }
 void call_statemate() { (void)bench_entry_statemate(); }
 void call_bsort100()  { (void)bench_entry_bsort100(); }
 
+void call_adpcm()         { (void)bench_entry_adpcm(); }
+void call_cnt()           { (void)bench_entry_cnt(); }
+void call_compress()      { (void)bench_entry_compress(); }
+void call_cover()         { (void)bench_entry_cover(); }
+void call_edn()           { (void)bench_entry_edn(); }
+void call_fac()           { (void)bench_entry_fac(); }
+void call_fdct()          { (void)bench_entry_fdct(); }
+void call_fibcall()       { (void)bench_entry_fibcall(); }
+void call_fir()           { (void)bench_entry_fir(); }
+void call_insertsort()    { (void)bench_entry_insertsort(); }
+void call_janne_complex() { (void)bench_entry_janne_complex(); }
+void call_lcdnum()        { (void)bench_entry_lcdnum(); }
+void call_lms()           { (void)bench_entry_lms(); }
+void call_ludcmp()        { (void)bench_entry_ludcmp(); }
+void call_minver()        { (void)bench_entry_minver(); }
+void call_ndes()          { (void)bench_entry_ndes(); }
+void call_nsichneu()      { (void)bench_entry_nsichneu(); }
+void call_prime()         { (void)bench_entry_prime(); }
+void call_qurt()          { (void)bench_entry_qurt(); }
+
+void call_duff()      { bench_entry_duff(); }
+void call_expint()    { bench_entry_expint(); }
+void call_jfdctint()  { bench_entry_jfdctint(); }
+void call_ns()        { bench_entry_ns(); }
+void call_recursion() { bench_entry_recursion(); }
+
+void call_bs()   { (void)bench_entry_bs(); }
+void call_whet() { (void)bench_entry_whet(); }
+
 const std::map<std::string, bench::entry_fn>& table() {
     static const std::map<std::string, bench::entry_fn> t = {
         { "matmult",   &call_matmult   },
@@ -42,6 +112,35 @@ const std::map<std::string, bench::entry_fn>& table() {
         { "ud",        &call_ud        },
         { "fft1",      &call_fft1      },
         { "statemate", &call_statemate },
+
+        { "adpcm",         &call_adpcm         },
+        { "cnt",           &call_cnt           },
+        { "compress",      &call_compress      },
+        { "cover",         &call_cover         },
+        { "edn",           &call_edn           },
+        { "fac",           &call_fac           },
+        { "fdct",          &call_fdct          },
+        { "fibcall",       &call_fibcall       },
+        { "fir",           &call_fir           },
+        { "insertsort",    &call_insertsort    },
+        { "janne_complex", &call_janne_complex },
+        { "lcdnum",        &call_lcdnum        },
+        { "lms",           &call_lms           },
+        { "ludcmp",        &call_ludcmp        },
+        { "minver",        &call_minver        },
+        { "ndes",          &call_ndes          },
+        { "nsichneu",      &call_nsichneu      },
+        { "prime",         &call_prime         },
+        { "qurt",          &call_qurt          },
+
+        { "duff",      &call_duff      },
+        { "expint",    &call_expint    },
+        { "jfdctint",  &call_jfdctint  },
+        { "ns",        &call_ns        },
+        { "recursion", &call_recursion },
+
+        { "bs",   &call_bs   },
+        { "whet", &call_whet },
     };
     return t;
 }

@@ -19,7 +19,10 @@ SCRIPTS_DIR  = scripts
 # -----------------------------------------------------------------------
 BENCH_DIR    = wcet_bench
 BENCH_OBJDIR = $(BENCH_DIR)/obj
-BENCH_NAMES  = matmult bsort100 crc ud fft1 statemate
+BENCH_NAMES  = adpcm bs bsort100 cnt compress cover crc duff edn expint \
+               fac fdct fft1 fibcall fir insertsort janne_complex jfdctint \
+               lcdnum lms ludcmp matmult minver ndes ns nsichneu prime \
+               qurt recursion statemate ud whet
 BENCH_OBJS   = $(addprefix $(BENCH_OBJDIR)/,$(addsuffix .o,$(BENCH_NAMES)))
 BENCH_CFLAGS = -std=gnu89 -O0 -fno-builtin -fno-stack-protector
 
@@ -78,7 +81,7 @@ execute_plan: $(SCRIPTS_DIR)/execute_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/execute_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp
 
 evaluation: $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(SRC_DIR)/bench_registry.hpp $(BENCH_OBJS) $(HDRS)
-	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(BENCH_OBJS)
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(BENCH_OBJS) -lm
 
 example_bin_packing: $(EXAMPLES_DIR)/example_bin_packing.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(EXAMPLES_DIR)/example_bin_packing.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp

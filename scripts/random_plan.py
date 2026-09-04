@@ -37,13 +37,28 @@ MS = 1_000_000
 # gcc -std=gnu89 -O0 -fno-builtin -fno-stack-protector, performance governor.
 # Rebuilding the benchmark objects at another -O level invalidates these.
 #
-# The pi4 column was taken from plans/deployment_plan_lowsat_pi04.json (commit
-# cd09f92); there is no table for it in RELATORIO.md.
+# The first six of the pi4 column were taken from
+# plans/deployment_plan_lowsat_pi04.json (commit cd09f92); there is no table
+# for it in RELATORIO.md. The other 26 are docs/tabelas-heuristicas.tex
+# tab:obs_wcet_pi4 (Time Mean column, us -> ns, exact since the source has 3
+# decimals), measured on the same Raspberry Pi 4 board.
+#
+# pi5 stays at six entries: there is no Pi 5 measurement anywhere in the repo
+# for the other 26, so --platform pi5 cannot use them.
 WCET_NS = {
     "pi5": {"matmult": 48050, "bsort100": 30310, "crc": 821,
             "ud": 789, "fft1": 746, "statemate": 207},
-    "pi4": {"matmult": 94963, "bsort100": 73833, "crc": 1259,
-            "ud": 2056, "fft1": 1574, "statemate": 389},
+    "pi4": {
+        "matmult": 94963, "bsort100": 73833, "crc": 1259,
+        "ud": 2056, "fft1": 1574, "statemate": 389,
+        "whet": 620381, "lms": 241010, "fir": 150057, "adpcm": 122303,
+        "edn": 43019, "ndes": 27269, "ns": 6339, "cover": 3783,
+        "prime": 3358, "nsichneu": 2412, "ludcmp": 2159, "minver": 1940,
+        "cnt": 1896, "compress": 1867, "jfdctint": 1768, "fdct": 1546,
+        "expint": 1366, "recursion": 1117, "duff": 927, "qurt": 691,
+        "insertsort": 597, "fibcall": 209, "fac": 175,
+        "janne_complex": 140, "lcdnum": 131, "bs": 106,
+    },
 }
 
 # The period grid every hand-written plan in the repo uses.

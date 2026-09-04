@@ -109,8 +109,8 @@ graph LR
 
     subgraph app["Application"]
         EX1["example_full_pipeline.cpp"]
-        EX2["example_eval.cpp"]
-        EX3["example_from_plan.cpp"]
+        EX2["evaluation.cpp"]
+        EX3["execute_plan.cpp"]
         EX4["example_dispatcher.cpp"]
         EX5["example_ring.cpp"]
         EX6["example_team_manager.cpp"]
@@ -673,7 +673,7 @@ uint64_t t_actual    = Dispatcher::monotonic_ns();
 uint64_t latency     = t_actual - t_scheduled;   // scheduling latency in ns
 ```
 
-This is exactly what `example_eval.cpp` uses to measure jitter and deadline misses.
+This is exactly what `evaluation.cpp` uses to measure jitter and deadline misses.
 
 ---
 
@@ -911,8 +911,8 @@ graph LR
         EP["example_pipeline\n(manual pipeline)"]
         ETM["example_team_manager\n(high-level API)"]
         EFP["example_full_pipeline\n(6 RMS tasks)"]
-        EFR["example_from_plan\n(loads JSON)"]
-        EEV["example_eval\n(latency measurement)"]
+        EFR["execute_plan\n(loads JSON)"]
+        EEV["evaluation\n(latency measurement)"]
     end
 
     ER --> RB
@@ -947,10 +947,10 @@ graph LR
 | `example_pipeline` | Manual linear pipeline with ring buffer | Full pattern: write on upstream, read on downstream |
 | `example_team_manager` | High-level API with TeamManager | How to use the recommended API; initialize→start→notify→stop cycle |
 | `example_full_pipeline` | 6 RMS pipelines, 18 subtasks, runs for 192 ms | Main demo; implicitly uses `plans/deployment_plan.json` |
-| `example_from_plan` | Loads JSON, constructs DAG, and executes | How to integrate the parser with TeamManager |
-| `example_eval` | Measures latency, jitter, deadline misses per subtask | Benchmarking tool; requires `sudo` for SCHED_FIFO |
+| `execute_plan` | Loads JSON, constructs DAG, and executes | How to integrate the parser with TeamManager |
+| `evaluation` | Measures latency, jitter, deadline misses per subtask | Benchmarking tool; requires `sudo` for SCHED_FIFO |
 
-> **Note on permissions:** `SCHED_FIFO` requires the `CAP_SYS_NICE` capability (equivalent to root). Without it, `pthread_setschedparam` fails silently and threads run at the default priority. The dispatcher prints a warning to stderr. For realistic latency results, run with `sudo ./example_eval plans/deployment_plan.json`.
+> **Note on permissions:** `SCHED_FIFO` requires the `CAP_SYS_NICE` capability (equivalent to root). Without it, `pthread_setschedparam` fails silently and threads run at the default priority. The dispatcher prints a warning to stderr. For realistic latency results, run with `sudo ./evaluation plans/deployment_plan.json`.
 
 ### Tests × Modules
 

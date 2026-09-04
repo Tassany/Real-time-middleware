@@ -1,6 +1,6 @@
 # Report: Scheduling Evaluation on Raspberry Pi 5 / PREEMPT_RT
 
-Results of `sudo ./example_eval plans/deployment_plan.json` on the target hardware.
+Results of `sudo ./evaluation plans/deployment_plan.json` on the target hardware.
 Written in English to match its sibling reports (`report_example_eval.md`,
 `report_heuristic_eval.md`).
 
@@ -40,7 +40,7 @@ block:
 The assignment happens at **parse time**, before the runtime exists.
 `JsonParser::parse` (`parser_json.cpp`) defaults each missing `core` to the sentinel
 `CORE_UNASSIGNED` (`-1`), notices that at least one subtask is unassigned, and calls
-`allocator::apply_auto_allocation(plan)` before returning. By the time `example_eval`
+`allocator::apply_auto_allocation(plan)` before returning. By the time `evaluation`
 builds its DAG and hands entries to `TeamManager`, every `core` is already a concrete
 number. Nothing downstream — dispatcher, team manager, the harness — knows an allocator
 ran; they see a fully-specified plan exactly as if it had been typed by hand.
@@ -193,7 +193,7 @@ case was subtask 3 at **8.1%** of its 1 ms deadline — roughly **12× of headro
 
 This should not be read as "the task set is schedulable". Two reasons:
 
-**The metric is start delay, not response time.** `example_eval.cpp:191` tests
+**The metric is start delay, not response time.** `evaluation.cpp:191` tests
 `latency > deadline_ns`, where `latency` is how late the subtask *started*. It never
 measures when the subtask *finished*. A subtask that starts on time and then overruns
 its deadline is counted as a success.
@@ -284,7 +284,7 @@ If the gap follows core 0, hypothesis 1 holds; if it follows the sources, hypoth
 Roughly in order of what would most improve the evidence:
 
 1. **Run far longer.** 192 ms is a smoke test. Raising the `4 × LCM` multiplier in
-   `example_eval.cpp:137` to cover minutes would make `Lat_max` mean something and give
+   `evaluation.cpp:137` to cover minutes would make `Lat_max` mean something and give
    the low-rate subtasks enough samples to compare.
 2. **Stop comparing `Lat_max` across unequal `Jobs`.** Either equalize sample counts or
    report a percentile (p99/p99.9) plus the sample count. The raw data is already in

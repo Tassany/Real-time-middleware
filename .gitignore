@@ -64,6 +64,7 @@ __MACOSX/
 /latency_samples.csv
 /latency_boxplot*.png
 /latency_heuristic_*.csv
+/overhead_pilot_*.csv
 /heuristic_eval_runs.csv
 /heuristic_eval_summary.csv
 /sweep_out/

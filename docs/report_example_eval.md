@@ -1,8 +1,8 @@
-# Report: Evaluation Harness and Improvements — `example_eval.cpp`
+# Report: Evaluation Harness and Improvements — `evaluation.cpp`
 
 ## 1. Overview
 
-`examples/example_eval.cpp` is the scheduling-quality evaluation harness for the MCFlow project. It loads a real deployment plan from JSON, fires subtasks at their configured periods, and collects per-subtask timing metrics — without touching the dispatcher itself.
+`scripts/evaluation.cpp` is the scheduling-quality evaluation harness for the MCFlow project. It loads a real deployment plan from JSON, fires subtasks at their configured periods, and collects per-subtask timing metrics — without touching the dispatcher itself.
 
 The core question it answers for every subtask in the task graph:
 
@@ -256,5 +256,5 @@ Column reference:
 > **Tip:** run with `sudo` to enable `SCHED_FIFO` and obtain cleaner measurements free from OS scheduler interference.
 
 ```bash
-sudo ./example_eval plans/deployment_plan.json
+sudo ./evaluation plans/deployment_plan.json
 ```

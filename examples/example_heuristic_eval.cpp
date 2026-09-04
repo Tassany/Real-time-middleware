@@ -18,7 +18,7 @@
  *   Tipo 4: período 24ms, prioridade 20
  *   Tipo 5: período 48ms, prioridade  6
  *
- * Estratégia de medição (idêntica a examples/example_eval.cpp, para que os
+ * Estratégia de medição (idêntica a scripts/evaluation.cpp, para que os
  * números sejam diretamente comparáveis no artigo):
  *   - Cada subtask mantém seu period_ns real; o release-guard de 6 passos do
  *     Dispatcher (dispatcher.hpp) fica ativo para todos os estágios.
@@ -155,7 +155,7 @@ static std::string slugify(const std::string& name) {
 // ---------------------------------------------------------------------------
 //  Executa uma rodada completa e retorna métricas agregadas
 //
-//  Medição idêntica a examples/example_eval.cpp: period_ns de cada subtask
+//  Medição idêntica a scripts/evaluation.cpp: period_ns de cada subtask
 //  fica intacto (release-guard real do Dispatcher ativo), e a latência de
 //  cada job é computada inline em execute() como
 //  t_actual - (next_release_ns - period_ns) — sem fire_time externo por
@@ -178,7 +178,7 @@ static EvalResult run_eval(const std::string& heuristic_name,
     std::map<int, std::vector<int>> preds;
     for (const auto& c : conns) preds[c.downstream].push_back(c.upstream);
 
-    // Fontes: subtasks sem predecessor (mesmo critério de example_eval.cpp)
+    // Fontes: subtasks sem predecessor (mesmo critério de evaluation.cpp)
     std::vector<std::pair<int, uint64_t>> sources;
     for (const auto& s : subtasks)
         if (preds.find(s.id) == preds.end())
@@ -239,7 +239,7 @@ static EvalResult run_eval(const std::string& heuristic_name,
     }
 
     // Lambdas de execução — latência medida via release-guard real do próprio
-    // subtask (igual a example_eval.cpp), não via fire_time de grupo. O corpo
+    // subtask (igual a evaluation.cpp), não via fire_time de grupo. O corpo
     // de cada estágio agora roda o código real analisado pelo Heptane
     // (wcet_components/{source,intermediate,sink}.c, ver
     // wcet_components_rt.hpp), não mais um cálculo trivial.
@@ -327,7 +327,7 @@ static EvalResult run_eval(const std::string& heuristic_name,
     tm.initialize(entries, dag);
     tm.start();
 
-    // Tick loop — igual a example_eval.cpp: sleep absoluto no menor período,
+    // Tick loop — igual a evaluation.cpp: sleep absoluto no menor período,
     // notifica cada fonte quando seu período divide o tick corrente.
     uint64_t next_tick = Dispatcher::monotonic_ns() + min_p;
     for (int tick = 1; tick <= ticks; ++tick) {
@@ -442,7 +442,7 @@ int main(int argc, char* argv[]) {
     int    num_cores  = (argc > 2) ? std::stoi(argv[2]) : 3;
     // Capacidade por core repassada a allocator::first_fit/best_fit/worst_fit.
     // Fixada aqui (em vez de depender do default de allocator.hpp) para que
-    // todas as 15 combinações da tabela usem exatamente o mesmo teto —
+    // todas as 18 combinações da tabela usem exatamente o mesmo teto —
     // testar saturação é só rodar com um valor > 1.0 (ex.: 5.0).
     double capacity   = (argc > 3) ? std::stod(argv[3]) : 1.0;
 
@@ -474,18 +474,20 @@ int main(int argc, char* argv[]) {
     // Task sorting criteria (Lupu et al. 2010, Sec. 3.2), restricted to
     // period and utilization since every subtask here uses an implicit
     // deadline (deadline_ns == period_ns) — deadline/density would be
-    // redundant with period/utilization respectively.
+    // redundant with period/utilization respectively. DRU (Verucchi et al.
+    // 2023, Sect. 4) additionally needs 'conns' to see the DAG topology.
     struct SortVariant { std::string suffix; allocator::SortCriterion crit; };
     static const std::vector<SortVariant> sort_variants = {
         { "PerAsc",   allocator::SortCriterion::PeriodAsc },
         { "PerDesc",  allocator::SortCriterion::PeriodDesc },
         { "UtilAsc",  allocator::SortCriterion::UtilizationAsc },
         { "UtilDesc", allocator::SortCriterion::UtilizationDesc },
+        { "DRU",      allocator::SortCriterion::RemainingUtilizationDesc },
     };
     for (const auto& sv : sort_variants) {
-        runs.push_back({ "FF+" + sv.suffix, allocator::first_fit(subtasks, num_cores, capacity, sv.crit) });
-        runs.push_back({ "BF+" + sv.suffix, allocator::best_fit(subtasks,  num_cores, capacity, sv.crit) });
-        runs.push_back({ "WF+" + sv.suffix, allocator::worst_fit(subtasks, num_cores, capacity, sv.crit) });
+        runs.push_back({ "FF+" + sv.suffix, allocator::first_fit(subtasks, num_cores, capacity, sv.crit, allocator::WeightMode::Utilization, conns) });
+        runs.push_back({ "BF+" + sv.suffix, allocator::best_fit(subtasks,  num_cores, capacity, sv.crit, allocator::WeightMode::Utilization, conns) });
+        runs.push_back({ "WF+" + sv.suffix, allocator::worst_fit(subtasks, num_cores, capacity, sv.crit, allocator::WeightMode::Utilization, conns) });
     }
 
     bool any_infeasible = false;

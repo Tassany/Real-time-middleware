@@ -10,9 +10,8 @@ For the data and figures these commands produced for the article, see
 
 ## Contents
 
-- [0. Before you start](#0-before-you-start)
-- [1. Build](#1-build)
-- [2. Run the tests](#2-run-the-tests)
+- [1. Before you start](#1-before-you-start)
+- [2. Build](#2-build)
 - [3. Inspect an allocation without running anything](#3-inspect-an-allocation-without-running-anything)
 - [4. Run a pipeline](#4-run-a-pipeline)
 - [5. Measure latency, jitter and deadline misses](#5-measure-latency-jitter-and-deadline-misses)
@@ -26,10 +25,8 @@ For the data and figures these commands produced for the article, see
 
 ## 0. Before you start
 
-**Hardware and kernel.** The numbers in the article come from a Raspberry Pi 5
-(Cortex-A76) running Linux with `PREEMPT_RT`. Everything builds and runs on an
-ordinary desktop kernel, and that is fine for exploring the tool, but latency
-measured without `PREEMPT_RT` is not comparable to anything reported here.
+**Hardware and kernel.** The numbers in the paper come from a Raspberry Pi 5
+(Cortex-A76) and a Raspberry Pi 4 Model B (Cortex-A72) running Linux with `PREEMPT_RT`.
 
 **Run as root.** The dispatcher threads request `SCHED_FIFO`. Without root you
 get this on every dispatcher, and the run continues under the default
@@ -68,43 +65,42 @@ they run on a bare board with no `pip` available.
 ## 1. Build
 
 ```bash
-make examples
+make harness
 ```
 
-Builds every example, including `example_eval`. The middleware sources live
-in `src/`, which the `Makefile` puts on the include path, so the examples and
-tests include its headers by bare name. The first build also compiles
-the six Malardalen benchmarks into `wcet_bench/obj/` and runs `objcopy` on each
-one, which is why `binutils` is a requirement.
+Builds the three programs every experiment below uses: `allocate`,
+`execute_plan` and `evaluation`. Their sources are in `scripts/`, next
+to the Python tooling, because they are instruments rather than examples. This
+first build also compiles the six Malardalen benchmarks into `wcet_bench/obj/`
+and runs `objcopy` on each one, which is why `binutils` is a requirement.
+
+The middleware sources live in `src/`, which the `Makefile` puts on the include
+path, so everything includes its headers by bare name.
 
 Individual targets, for when you only need one:
 
 ```bash
-make show_alloc example_eval example_from_plan
+make allocate evaluation execute_plan
+```
+
+The demo programs in `examples/`, one per building block of the middleware, are
+not needed for any experiment and build separately:
+
+```bash
+make examples
 ```
 
 ```bash
 make clean
 ```
 
-## 2. Run the tests
+## 2. Inspect an allocation without running anything
 
-```bash
-make test
-```
-
-Six suites, 35 assertions, covering phases 0 to 5: parser, DAG, ring buffer,
-component model, dispatcher, team manager. They pass without root; the team
-manager suite prints the `RT priority not applied` warning, which is expected
-there.
-
-## 3. Inspect an allocation without running anything
-
-`show_alloc` parses a plan, lets the allocator assign cores, and prints the
+`allocate` parses a plan, lets the allocator assign cores, and prints the
 result. Nothing is executed, so it needs no root and takes no time.
 
 ```bash
-make show_alloc && ./show_alloc plans/deployment_plan_sat.json
+make allocate && ./allocate plans/deployment_plan_sat.json
 ```
 
 It prints the `allocation` block in effect, one line per subtask with its
@@ -128,7 +124,7 @@ a measurement run on it.
 ## 4. Run a pipeline
 
 ```bash
-sudo ./example_from_plan plans/deployment_plan.json 4
+sudo ./execute_plan plans/deployment_plan.json 4
 ```
 
 The second argument is the number of hyperperiods to simulate; it defaults to
@@ -142,7 +138,7 @@ sink prints it.
 This is the measurement harness used for the article.
 
 ```bash
-sudo ./example_eval plans/deployment_plan_lowsat.json 50
+sudo ./evaluation plans/deployment_plan_lowsat.json 50
 ```
 
 Latency is `t_actual - t_scheduled`, sampled at the entry of `execute()`;
@@ -169,8 +165,8 @@ file is overwritten by the next run, so rename it before running again.
 This reproduces the two tables in `docs/tabelas-heuristicas.tex` and the
 contents of `results/`.
 
-There is no command-line flag for the allocation strategy: both `show_alloc`
-and `example_eval` read it from the `allocation` block of the plan. Comparing
+There is no command-line flag for the allocation strategy: both `allocate`
+and `evaluation` read it from the `allocation` block of the plan. Comparing
 heuristics therefore means editing the plan between runs.
 
 For each of the two load levels, `plans/deployment_plan_lowsat.json` (96 subtasks)
@@ -181,11 +177,11 @@ sed -i 's/"strategy": "[a-z_]*"/"strategy": "worst_fit"/' plans/deployment_plan_
 ```
 
 ```bash
-./show_alloc plans/deployment_plan_lowsat.json | tail -6
+./allocate plans/deployment_plan_lowsat.json | tail -6
 ```
 
 ```bash
-sudo ./example_eval plans/deployment_plan_lowsat.json 50
+sudo ./evaluation plans/deployment_plan_lowsat.json 50
 ```
 
 ```bash
@@ -250,27 +246,6 @@ campaign in `wcet_bench/cycle_counter/RELATORIO.md`. `--platform pi4` was
 back-filled from an older plan file and has no report behind it, so treat those
 numbers as weaker evidence.
 
-## 9. Find where the scheduler saturates
-
-```bash
-sudo python3 scripts/saturation_sweep.py --start 1 --stop 6 --step 0.5
-```
-
-Each step scales the shape of `plans/deployment_plan_lowsat.json` by a factor, writes
-the plan, runs `example_eval` on it, and records the outcome in `--outdir`
-(default `sweep_out/`): `sweep.csv` with one row per step, plus the generated
-`plan_<level>.json` and the raw `latency_<level>.csv` of every step.
-
-Two load axes are reported per step, and they do not saturate together:
-
-- `util_per_core` — `sum(wcet/period) / cores`, what `allocator.hpp` reasons
-  about;
-- `dispatches_ms` — jobs released per millisecond. Each one pays a roughly
-  constant queue, notify and clock cost that the utilization model does not
-  see, which is what binds first in practice.
-
-`--stop-at-miss PCT` aborts the sweep once the miss rate crosses a threshold,
-which saves a lot of time when you only want to locate the knee.
 
 ## 10. Plot the results
 
@@ -304,36 +279,3 @@ Fit, still has 4.4% of its jobs above 8 ms. Use the flag to look at the body of
 the distribution, never to clean the data, and quote the discarded fraction
 whenever you show a truncated figure. The figures stored in `results/` were
 generated without it, on the full samples.
-
-## Deployment plans in this repository
-
-All plans live in `plans/`.
-
-| Plan | Tasks | Subtasks | Purpose |
-|---|---:|---:|---|
-| `deployment_plan.json` | 6 | 18 | the small hand-written example, harmonic periods 1 to 48 ms |
-| `deployment_plan_wcet.json` | 6 | 18 | same shape, with `wcet_ns` filled in |
-| `deployment_plan_lowsat.json` | 32 | 96 | low saturation, first table of the article |
-| `deployment_plan_lowsat_pi04.json` | 32 | 96 | same shape with the Pi 4 WCET table |
-| `deployment_plan_sat.json` | 54 | 162 | high saturation, second table of the article |
-| `deployment_plan_oversat.json` | 63 | 189 | past saturation |
-| `deployment_plan_random.json` | 32 | 109 | example output of `scripts/random_plan.py` |
-
-## Pitfalls
-
-- **Fixed output names.** `example_eval` always writes `latency_samples.csv`,
-  and `plot_latency.py` always writes `latency_boxplot_by_core.png`, in the
-  current directory. Rename before the next run or lose the previous one.
-- **The strategy lives in the plan file.** Editing it changes the meaning of
-  every later run against that plan, including runs you did not intend to
-  change. Restore it afterwards.
-- **`capacity: 0` means no limit.** With `first_fit` and no capacity, the
-  allocator legitimately fills core 0 first and may leave the other cores
-  empty. That is the heuristic working, not a bug.
-- **Utilization needs WCET.** A plan whose subtasks carry no `wcet_ns` has zero
-  utilization everywhere, so any `weight: utilization` strategy sees all cores
-  as equally empty and piles everything onto core 0.
-  `docs/report_eval_rpi5.md` section 2.3 documents this in detail.
-- **WCETs are platform-specific.** The values in the plans were measured on a
-  Raspberry Pi 5. Running them elsewhere without re-measuring makes the
-  allocator's arithmetic fiction.
