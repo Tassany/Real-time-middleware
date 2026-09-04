@@ -95,6 +95,9 @@ example_heuristic_eval: $(EXAMPLES_DIR)/example_heuristic_eval.cpp $(SRC_DIR)/te
 example_eval_preemptive: $(EXAMPLES_DIR)/example_eval_preemptive.cpp $(SRC_DIR)/preemptive_team_manager.cpp $(SRC_DIR)/preemptive_team_manager.hpp $(SRC_DIR)/preemptive_dispatcher.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $(EXAMPLES_DIR)/example_eval_preemptive.cpp $(SRC_DIR)/preemptive_team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp
 
+example_overhead_pilot: $(EXAMPLES_DIR)/example_overhead_pilot.cpp $(SRC_DIR)/dispatcher.hpp
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $(EXAMPLES_DIR)/example_overhead_pilot.cpp
+
 examples: example_ring example_eventfd example_two_threads example_dispatcher example_epoll example_pipeline example_team_manager example_full_pipeline
 
 # -----------------------------------------------------------------------
@@ -160,7 +163,8 @@ clean:
 	      example_epoll example_pipeline example_team_manager example_full_pipeline \
 	      execute_plan evaluation example_bin_packing \
 	      example_saturation example_heuristic_eval allocate \
-	      codegen
+	      example_overhead_pilot codegen
+	rm -f overhead_pilot_dispatch_vazio.csv overhead_pilot_aresta_intra.csv overhead_pilot_aresta_inter.csv
 	rm -f generated/main_generated.cpp generated/Makefile generated/main_generated
 	rm -rf $(BENCH_OBJDIR)
 
