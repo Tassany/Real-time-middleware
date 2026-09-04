@@ -20,6 +20,16 @@ Output goes to --outdir:
     seed<N>_{none,dru}.csv        evaluation's raw latency samples
     summary.csv                   one row per (seed, config)
 
+Default --periods (10-120ms) is deliberately longer than random_plan.py's own
+default (1-12ms): at --tasks 32 the short grid drives ~40 dispatches/ms,
+which is more than the measured dispatch overhead (~65-70us median per
+release, see the Fase 2 overhead pilot) can absorb even before any real
+benchmark WCET is spent — every config ends up dominated by dispatch
+saturation, not by the sort criterion being compared. Confirmed empirically:
+the first full run at the short grid gave a mixed, seed-dependent result
+(DRU better in 3 of 5 seeds, worse in 2, one large outlier) at 7-47% miss
+rates despite declared utilization of only 0.5-0.7 per core.
+
 Stdlib only, so it runs on a bare Raspberry Pi.
 """
 
@@ -50,6 +60,7 @@ def generate_base_plan(seed, args, out_path):
     cmd = [sys.executable, RANDOM_PLAN,
            "--seed", str(seed), "--platform", args.platform,
            "--tasks", str(args.tasks),
+           "--periods", args.periods,
            "--min-subtasks", str(args.min_subtasks),
            "--max-subtasks", str(args.max_subtasks),
            "--cores", str(args.cores),
@@ -108,6 +119,15 @@ def main():
     ap.add_argument("--seed-start", type=int, default=1)
     ap.add_argument("--platform", default="pi4", choices=["pi4", "pi5"])
     ap.add_argument("--tasks", type=int, default=32)
+    ap.add_argument("--periods", default="10,20,30,40,60,120",
+                    help="comma-separated period grid in ms, passed through to "
+                         "random_plan.py. Longer than random_plan.py's own "
+                         "default (1,2,3,4,6,12): at 32 tasks that grid drives "
+                         "~40 dispatches/ms, well past what the measured "
+                         "dispatch overhead (~65-70us median, see the Fase 2 "
+                         "pilot) can absorb, so the comparison ends up "
+                         "dominated by dispatch saturation instead of the "
+                         "sort criterion.")
     ap.add_argument("--min-subtasks", type=int, default=2)
     ap.add_argument("--max-subtasks", type=int, default=5)
     ap.add_argument("--cores", type=int, default=3)
