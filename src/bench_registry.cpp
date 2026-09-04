@@ -1,6 +1,7 @@
 #include "bench_registry.hpp"
 
 #include <map>
+#include <mutex>
 #include <set>
 #include <stdexcept>
 #include <sys/mman.h>
@@ -68,41 +69,65 @@ int bench_entry_whet(void);
 
 namespace {
 
-void call_matmult()   { bench_entry_matmult(); }
-void call_ud()        { bench_entry_ud(); }
-void call_fft1()      { bench_entry_fft1(); }
-void call_crc()       { (void)bench_entry_crc(); }
-void call_statemate() { (void)bench_entry_statemate(); }
-void call_bsort100()  { (void)bench_entry_bsort100(); }
+// wcet_bench sources keep their working data in global/static state (e.g.
+// matmult.c's file-scope `ArrayA`/`ArrayB`/`ResultArray`, recursion.c's
+// `In`) — fine for the single-threaded bare-metal target they were written
+// for, but not here: two subtasks that draw the SAME benchmark name can
+// land on different cores and execute concurrently, racing on that shared
+// state. Reproduced directly: two subtasks both running "whet" on different
+// cores crashed `evaluation` with a segfault within seconds. Each benchmark
+// gets its own mutex so a second concurrent caller waits instead of racing.
+// This does mean a subtask can occasionally block on another core's subtask
+// when they happen to share a benchmark and overlap in time — rare, and a
+// slow-but-correct run beats a crash — but it is a real inter-core
+// dependency the project's timing analysis does not model.
+template <typename Fn>
+inline void serialized(std::mutex& mtx, Fn&& fn) {
+    std::lock_guard<std::mutex> lock(mtx);
+    fn();
+}
 
-void call_adpcm()         { (void)bench_entry_adpcm(); }
-void call_cnt()           { (void)bench_entry_cnt(); }
-void call_compress()      { (void)bench_entry_compress(); }
-void call_cover()         { (void)bench_entry_cover(); }
-void call_edn()           { (void)bench_entry_edn(); }
-void call_fac()           { (void)bench_entry_fac(); }
-void call_fdct()          { (void)bench_entry_fdct(); }
-void call_fibcall()       { (void)bench_entry_fibcall(); }
-void call_fir()           { (void)bench_entry_fir(); }
-void call_insertsort()    { (void)bench_entry_insertsort(); }
-void call_janne_complex() { (void)bench_entry_janne_complex(); }
-void call_lcdnum()        { (void)bench_entry_lcdnum(); }
-void call_lms()           { (void)bench_entry_lms(); }
-void call_ludcmp()        { (void)bench_entry_ludcmp(); }
-void call_minver()        { (void)bench_entry_minver(); }
-void call_ndes()          { (void)bench_entry_ndes(); }
-void call_nsichneu()      { (void)bench_entry_nsichneu(); }
-void call_prime()         { (void)bench_entry_prime(); }
-void call_qurt()          { (void)bench_entry_qurt(); }
+std::mutex mtx_matmult, mtx_ud, mtx_fft1, mtx_crc, mtx_statemate, mtx_bsort100;
+void call_matmult()   { serialized(mtx_matmult,   [] { bench_entry_matmult(); }); }
+void call_ud()        { serialized(mtx_ud,        [] { bench_entry_ud(); }); }
+void call_fft1()      { serialized(mtx_fft1,      [] { bench_entry_fft1(); }); }
+void call_crc()       { serialized(mtx_crc,       [] { (void)bench_entry_crc(); }); }
+void call_statemate() { serialized(mtx_statemate, [] { (void)bench_entry_statemate(); }); }
+void call_bsort100()  { serialized(mtx_bsort100,  [] { (void)bench_entry_bsort100(); }); }
 
-void call_duff()      { bench_entry_duff(); }
-void call_expint()    { bench_entry_expint(); }
-void call_jfdctint()  { bench_entry_jfdctint(); }
-void call_ns()        { bench_entry_ns(); }
-void call_recursion() { bench_entry_recursion(); }
+std::mutex mtx_adpcm, mtx_cnt, mtx_compress, mtx_cover, mtx_edn, mtx_fac, mtx_fdct,
+           mtx_fibcall, mtx_fir, mtx_insertsort, mtx_janne_complex, mtx_lcdnum,
+           mtx_lms, mtx_ludcmp, mtx_minver, mtx_ndes, mtx_nsichneu, mtx_prime, mtx_qurt;
+void call_adpcm()         { serialized(mtx_adpcm,         [] { (void)bench_entry_adpcm(); }); }
+void call_cnt()           { serialized(mtx_cnt,           [] { (void)bench_entry_cnt(); }); }
+void call_compress()      { serialized(mtx_compress,      [] { (void)bench_entry_compress(); }); }
+void call_cover()         { serialized(mtx_cover,         [] { (void)bench_entry_cover(); }); }
+void call_edn()           { serialized(mtx_edn,           [] { (void)bench_entry_edn(); }); }
+void call_fac()           { serialized(mtx_fac,           [] { (void)bench_entry_fac(); }); }
+void call_fdct()          { serialized(mtx_fdct,          [] { (void)bench_entry_fdct(); }); }
+void call_fibcall()       { serialized(mtx_fibcall,       [] { (void)bench_entry_fibcall(); }); }
+void call_fir()           { serialized(mtx_fir,           [] { (void)bench_entry_fir(); }); }
+void call_insertsort()    { serialized(mtx_insertsort,    [] { (void)bench_entry_insertsort(); }); }
+void call_janne_complex() { serialized(mtx_janne_complex, [] { (void)bench_entry_janne_complex(); }); }
+void call_lcdnum()        { serialized(mtx_lcdnum,        [] { (void)bench_entry_lcdnum(); }); }
+void call_lms()           { serialized(mtx_lms,           [] { (void)bench_entry_lms(); }); }
+void call_ludcmp()        { serialized(mtx_ludcmp,        [] { (void)bench_entry_ludcmp(); }); }
+void call_minver()        { serialized(mtx_minver,        [] { (void)bench_entry_minver(); }); }
+void call_ndes()          { serialized(mtx_ndes,          [] { (void)bench_entry_ndes(); }); }
+void call_nsichneu()      { serialized(mtx_nsichneu,      [] { (void)bench_entry_nsichneu(); }); }
+void call_prime()         { serialized(mtx_prime,         [] { (void)bench_entry_prime(); }); }
+void call_qurt()          { serialized(mtx_qurt,          [] { (void)bench_entry_qurt(); }); }
 
-void call_bs()   { (void)bench_entry_bs(); }
-void call_whet() { (void)bench_entry_whet(); }
+std::mutex mtx_duff, mtx_expint, mtx_jfdctint, mtx_ns, mtx_recursion;
+void call_duff()      { serialized(mtx_duff,      [] { bench_entry_duff(); }); }
+void call_expint()    { serialized(mtx_expint,    [] { bench_entry_expint(); }); }
+void call_jfdctint()  { serialized(mtx_jfdctint,  [] { bench_entry_jfdctint(); }); }
+void call_ns()        { serialized(mtx_ns,        [] { bench_entry_ns(); }); }
+void call_recursion() { serialized(mtx_recursion, [] { bench_entry_recursion(); }); }
+
+std::mutex mtx_bs, mtx_whet;
+void call_bs()   { serialized(mtx_bs,   [] { (void)bench_entry_bs(); }); }
+void call_whet() { serialized(mtx_whet, [] { (void)bench_entry_whet(); }); }
 
 const std::map<std::string, bench::entry_fn>& table() {
     static const std::map<std::string, bench::entry_fn> t = {
