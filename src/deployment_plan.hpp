@@ -51,7 +51,8 @@ struct AllocationConfig {
     std::string strategy  = "worst_fit";     // first_fit | best_fit | worst_fit
     std::string sort_by   = "priority_desc"; // priority_desc | priority_asc | period_asc |
                                              // period_desc | utilization_asc |
-                                             // utilization_desc | none
+                                             // utilization_desc | remaining_utilization_desc |
+                                             // none
     std::string weight    = "count";         // count | utilization
     int         num_cores = 0;               // 0 = all online CPUs
     double      capacity  = 0.0;             // 0 = derive from weight mode

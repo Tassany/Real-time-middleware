@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <queue>
 #include <unistd.h>
 
 // Result of a bin-packing allocation.
@@ -67,6 +68,12 @@ enum class SortCriterion {
     UtilizationDesc,
     PriorityDesc,
     PriorityAsc,
+    // Decreasing Remaining Utilization (Verucchi et al. 2023, Sect. 4): each
+    // node's remaining utilization is the sum of utilization of every
+    // transitive descendant in the DAG. Needs a precomputed map (see
+    // detail::compute_remaining_utilization) because it cannot be derived
+    // from a single subtask in isolation like the other criteria.
+    RemainingUtilizationDesc,
 };
 
 enum class Strategy {
@@ -78,7 +85,8 @@ enum class Strategy {
 // Orders subtasks in place according to crit. Stable so that ties keep
 // their original (arrival) order, matching the paper's "no criterion"
 // baseline when applied to an already-tied task set.
-inline void sort_subtasks(std::vector<SubtaskInfo>& subtasks, SortCriterion crit) {
+inline void sort_subtasks(std::vector<SubtaskInfo>& subtasks, SortCriterion crit,
+                          const std::map<int, double>* remaining_util = nullptr) {
     switch (crit) {
         case SortCriterion::None:
             break;
@@ -106,10 +114,76 @@ inline void sort_subtasks(std::vector<SubtaskInfo>& subtasks, SortCriterion crit
             std::stable_sort(subtasks.begin(), subtasks.end(),
                 [](const SubtaskInfo& a, const SubtaskInfo& b) { return a.priority < b.priority; });
             break;
+        case SortCriterion::RemainingUtilizationDesc:
+            if (!remaining_util)
+                throw std::runtime_error(
+                    "sort_subtasks: RemainingUtilizationDesc requires a "
+                    "precomputed remaining-utilization map");
+            std::stable_sort(subtasks.begin(), subtasks.end(),
+                [remaining_util](const SubtaskInfo& a, const SubtaskInfo& b) {
+                    return remaining_util->at(a.id) > remaining_util->at(b.id);
+                });
+            break;
     }
 }
 
 namespace detail {
+
+// Remaining utilization of each subtask: the sum of utilization(s) over
+// every transitive descendant s reachable through 'connections' (Verucchi
+// et al. 2023, Sect. 4 — DRU). Computed in one reverse-topological pass
+// (Kahn's algorithm over out-degree, sinks first) mirroring
+// DAG::topological_sort, but as a free function here because the DAG class
+// is only built later, by TeamManager, from live ComponentBase* objects —
+// it does not exist yet at parse time.
+//
+// Only edges whose both endpoints are in 'subtasks' are considered. Callers
+// must pass the full subtask set (fixed-core included), not just the ones
+// being packed: a free subtask upstream of a manually-pinned one would
+// otherwise lose that pinned subtask's contribution to its remaining
+// utilization.
+inline std::map<int, double> compute_remaining_utilization(
+        const std::vector<SubtaskInfo>& subtasks,
+        const std::vector<ConnectionInfo>& connections) {
+
+    std::map<int, double> util_of;
+    for (const auto& s : subtasks) util_of[s.id] = utilization(s);
+
+    std::map<int, std::vector<int>> predecessors;
+    std::map<int, int> out_degree;
+    for (const auto& s : subtasks) out_degree[s.id] = 0;
+
+    for (const auto& c : connections) {
+        if (!util_of.count(c.upstream) || !util_of.count(c.downstream))
+            continue; // edge leaves the considered subtask set; ignore it
+        predecessors[c.downstream].push_back(c.upstream);
+        out_degree[c.upstream] += 1;
+    }
+
+    std::map<int, double> remaining;
+    for (const auto& s : subtasks) remaining[s.id] = 0.0;
+
+    std::queue<int> ready;
+    for (const auto& [id, deg] : out_degree)
+        if (deg == 0) ready.push(id);
+
+    std::size_t processed = 0;
+    while (!ready.empty()) {
+        int v = ready.front(); ready.pop();
+        ++processed;
+        for (int p : predecessors[v]) {
+            remaining[p] += util_of.at(v) + remaining.at(v);
+            if (--out_degree.at(p) == 0) ready.push(p);
+        }
+    }
+
+    if (processed < subtasks.size())
+        throw std::runtime_error(
+            "allocator: cycle detected in plan connections while computing "
+            "remaining utilization for DRU sort");
+
+    return remaining;
+}
 
 // Picks the core a subtask of load u goes on, or -1 if it fits nowhere.
 inline int choose_core(Strategy strat, const std::vector<double>& core_util,
@@ -148,8 +222,9 @@ inline AllocationResult pack(std::vector<SubtaskInfo> subtasks,
                              double capacity,
                              SortCriterion sort_by,
                              WeightMode mode,
-                             const std::vector<double>& initial_util) {
-    sort_subtasks(subtasks, sort_by);
+                             const std::vector<double>& initial_util,
+                             const std::map<int, double>* remaining_util = nullptr) {
+    sort_subtasks(subtasks, sort_by, remaining_util);
 
     AllocationResult r;
     r.subtasks = std::move(subtasks);
@@ -169,33 +244,63 @@ inline AllocationResult pack(std::vector<SubtaskInfo> subtasks,
 } // namespace detail
 
 // First Fit: place each subtask on the first core that has room.
+//
+// 'connections' only matters for SortCriterion::RemainingUtilizationDesc
+// (DRU); every other criterion neither reads it nor pays for the map below.
+// An empty 'connections' together with DRU is not an error: it degenerates
+// to "every node has remaining_util == 0" (a stable no-op ordering), which
+// is indistinguishable from — and as valid as — a plan that genuinely
+// declares no edges.
 inline AllocationResult first_fit(std::vector<SubtaskInfo> subtasks,
                                   int num_cores,
                                   double capacity = 1.0,
                                   SortCriterion sort_by = SortCriterion::None,
-                                  WeightMode mode = WeightMode::Utilization) {
+                                  WeightMode mode = WeightMode::Utilization,
+                                  const std::vector<ConnectionInfo>& connections = {}) {
+    std::map<int, double> remaining_map;
+    const std::map<int, double>* remaining_ptr = nullptr;
+    if (sort_by == SortCriterion::RemainingUtilizationDesc) {
+        remaining_map = detail::compute_remaining_utilization(subtasks, connections);
+        remaining_ptr = &remaining_map;
+    }
     return detail::pack(std::move(subtasks), Strategy::FirstFit, num_cores,
-                        capacity, sort_by, mode, {});
+                        capacity, sort_by, mode, {}, remaining_ptr);
 }
 
-// Best Fit: place each subtask on the core with the least remaining room that still fits.
+// Best Fit: place each subtask on the core with the least remaining room that
+// still fits. See first_fit() for the 'connections'/DRU contract.
 inline AllocationResult best_fit(std::vector<SubtaskInfo> subtasks,
                                  int num_cores,
                                  double capacity = 1.0,
                                  SortCriterion sort_by = SortCriterion::None,
-                                 WeightMode mode = WeightMode::Utilization) {
+                                 WeightMode mode = WeightMode::Utilization,
+                                 const std::vector<ConnectionInfo>& connections = {}) {
+    std::map<int, double> remaining_map;
+    const std::map<int, double>* remaining_ptr = nullptr;
+    if (sort_by == SortCriterion::RemainingUtilizationDesc) {
+        remaining_map = detail::compute_remaining_utilization(subtasks, connections);
+        remaining_ptr = &remaining_map;
+    }
     return detail::pack(std::move(subtasks), Strategy::BestFit, num_cores,
-                        capacity, sort_by, mode, {});
+                        capacity, sort_by, mode, {}, remaining_ptr);
 }
 
 // Worst Fit: place each subtask on the core with the most remaining room.
+// See first_fit() for the 'connections'/DRU contract.
 inline AllocationResult worst_fit(std::vector<SubtaskInfo> subtasks,
                                   int num_cores,
                                   double capacity = 1.0,
                                   SortCriterion sort_by = SortCriterion::None,
-                                  WeightMode mode = WeightMode::Utilization) {
+                                  WeightMode mode = WeightMode::Utilization,
+                                  const std::vector<ConnectionInfo>& connections = {}) {
+    std::map<int, double> remaining_map;
+    const std::map<int, double>* remaining_ptr = nullptr;
+    if (sort_by == SortCriterion::RemainingUtilizationDesc) {
+        remaining_map = detail::compute_remaining_utilization(subtasks, connections);
+        remaining_ptr = &remaining_map;
+    }
     return detail::pack(std::move(subtasks), Strategy::WorstFit, num_cores,
-                        capacity, sort_by, mode, {});
+                        capacity, sort_by, mode, {}, remaining_ptr);
 }
 
 // -----------------------------------------------------------------------
@@ -228,6 +333,8 @@ inline SortCriterion parse_sort_by(const std::string& v) {
     if (v == "utilization_desc") return SortCriterion::UtilizationDesc;
     if (v == "priority_desc")    return SortCriterion::PriorityDesc;
     if (v == "priority_asc")     return SortCriterion::PriorityAsc;
+    if (v == "remaining_utilization_desc" || v == "dru")
+        return SortCriterion::RemainingUtilizationDesc;
     throw std::runtime_error("allocation.sort_by: unknown value '" + v + "'");
 }
 
@@ -263,6 +370,19 @@ inline void apply_auto_allocation(DeploymentPlan& plan) {
 
     // Split pinned from free, seeding the cores with the pinned load.
     const std::vector<SubtaskInfo> all = flatten(plan);
+
+    // DRU's remaining-utilization map must be computed over the whole plan
+    // (pinned + free subtasks) before the split below, so a free subtask
+    // upstream of a manually-pinned one still counts the pinned one's
+    // utilization. Computed only when requested, so a malformed
+    // (cyclic) 'connections' does not break plans that do not use DRU.
+    std::map<int, double> remaining_map;
+    const std::map<int, double>* remaining_ptr = nullptr;
+    if (sort == SortCriterion::RemainingUtilizationDesc) {
+        remaining_map = detail::compute_remaining_utilization(all, plan.connections);
+        remaining_ptr = &remaining_map;
+    }
+
     std::vector<SubtaskInfo> free;
     std::vector<double>      seed(num_cores, 0.0);
 
@@ -285,7 +405,7 @@ inline void apply_auto_allocation(DeploymentPlan& plan) {
     }
 
     AllocationResult r = detail::pack(std::move(free), strat, num_cores,
-                                      capacity, sort, mode, seed);
+                                      capacity, sort, mode, seed, remaining_ptr);
 
     if (!r.feasible) {
         std::string ids;

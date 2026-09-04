@@ -184,7 +184,7 @@ def main():
     ap.add_argument("--sort-by", default="none",
                     choices=["priority_desc", "priority_asc", "period_asc",
                              "period_desc", "utilization_asc", "utilization_desc",
-                             "none"])
+                             "remaining_utilization_desc", "none"])
     ap.add_argument("--weight", default="utilization",
                     choices=["count", "utilization"])
     ap.add_argument("--capacity", type=float, default=0.0,
