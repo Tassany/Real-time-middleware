@@ -218,6 +218,20 @@ def main():
         print("-" * 36)
         print(f"{'mean':>6} {mean_d_miss:>12.2f} {mean_d_lat:>15.1f}")
 
+        # Win tally: how many seeds each config came out ahead on, per
+        # metric. Ties (equal to within float noise) count as neither.
+        def tally(idx):
+            dru_wins  = sum(1 for d in diffs if d[idx] < 0)
+            none_wins = sum(1 for d in diffs if d[idx] > 0)
+            ties      = len(diffs) - dru_wins - none_wins
+            return dru_wins, none_wins, ties
+
+        miss_w = tally(0)
+        lat_w  = tally(1)
+        print(f"\nwins out of {len(diffs)} seeds (lower is better):")
+        print(f"  miss_pct:    dru {miss_w[0]:>2}  none {miss_w[1]:>2}  tie {miss_w[2]:>2}")
+        print(f"  lat_mean_us: dru {lat_w[0]:>2}  none {lat_w[1]:>2}  tie {lat_w[2]:>2}")
+
 
 if __name__ == "__main__":
     main()
