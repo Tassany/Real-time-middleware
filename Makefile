@@ -83,6 +83,9 @@ execute_plan: $(SCRIPTS_DIR)/execute_plan.cpp $(SRC_DIR)/team_manager.cpp $(SRC_
 evaluation: $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(SRC_DIR)/bench_registry.hpp $(BENCH_OBJS) $(HDRS)
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/evaluation.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(BENCH_OBJS) -lm
 
+evaluation_precise: $(SCRIPTS_DIR)/evaluation_precise.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/team_manager.hpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(SRC_DIR)/bench_registry.hpp $(BENCH_OBJS) $(HDRS)
+	$(CXX) $(CXXFLAGS) -pthread -o $@ $(SCRIPTS_DIR)/evaluation_precise.cpp $(SRC_DIR)/team_manager.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/bench_registry.cpp $(BENCH_OBJS) -lm
+
 example_bin_packing: $(EXAMPLES_DIR)/example_bin_packing.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp $(SRC_DIR)/allocator.hpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(EXAMPLES_DIR)/example_bin_packing.cpp $(SRC_DIR)/parser_json.cpp $(SRC_DIR)/dag.cpp
 

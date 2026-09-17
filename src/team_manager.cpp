@@ -1,4 +1,5 @@
 #include "team_manager.hpp"
+#include <algorithm>
 
 TeamManager::TeamManager() : state_(State::CREATED) {}
 
@@ -53,6 +54,11 @@ void TeamManager::initialize(const std::vector<SubtaskEntry>& entries,
         subtask_dispatcher_[id] = dispatchers_.at(cp).get();
     }
 
+    // Node lookup by id, needed below to find "which predecessor index am I"
+    // from a successor's point of view (that index becomes its fan-in bit).
+    std::map<int, const DAG::Node*> node_by_id;
+    for (const auto& node : dag.nodes()) node_by_id[node.id] = &node;
+
     // --- Configure each subtask and wire connections ---
     for (const auto& node : dag.nodes()) {
         int id = node.id;
@@ -64,16 +70,32 @@ void TeamManager::initialize(const std::vector<SubtaskEntry>& entries,
         // Scheduling metadata from SubtaskInfo
         s->period_ns = info->period_ns;
 
-        // fan_in_total derived from the DAG (min 1 for source nodes)
-        s->fan_in_total = static_cast<int>(node.predecessors.size());
-        if (s->fan_in_total < 1) s->fan_in_total = 1;
-        s->fan_in_received.store(0);
+        // fan_in_mask_full derived from the DAG: one bit per predecessor
+        // (min 1 bit for source nodes, which have none but are ticked
+        // externally via TeamManager::notify using the default bit 0).
+        const std::size_t n_preds = node.predecessors.size();
+        if (n_preds > 64)
+            throw std::runtime_error(
+                "TeamManager::initialize: subtask " + std::to_string(id) +
+                " has " + std::to_string(n_preds) +
+                " predecessors, more than the 64-bit fan-in mask supports");
+        s->fan_in_mask_full = (n_preds == 0) ? 1
+                            : (n_preds == 64) ? ~std::uint64_t(0)
+                            : ((std::uint64_t(1) << n_preds) - 1);
+        s->fan_in_mask.store(0);
 
-        // Downstream wiring: use each successor's Dispatcher (may be shared)
+        // Downstream wiring: use each successor's Dispatcher (may be shared).
+        // supplier_bit = this node's index in the successor's predecessor
+        // list, so two predecessors of the same node never share a bit.
         s->downstream.clear();
-        for (int succ_id : node.successors)
+        for (int succ_id : node.successors) {
+            const auto& succ_preds = node_by_id.at(succ_id)->predecessors;
+            auto it = std::find(succ_preds.begin(), succ_preds.end(), id);
+            std::size_t bit_index = static_cast<std::size_t>(it - succ_preds.begin());
             s->downstream.push_back({subtask_dispatcher_.at(succ_id),
-                                     subtasks_.at(succ_id)});
+                                     subtasks_.at(succ_id),
+                                     std::uint64_t(1) << bit_index});
+        }
 
         // Register subtask with its (possibly shared) Dispatcher
         subtask_dispatcher_.at(id)->register_subtask(s);

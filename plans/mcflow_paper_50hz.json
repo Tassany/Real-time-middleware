@@ -1,0 +1,346 @@
+{
+  "hosts": [
+    {
+      "name": "localhost",
+      "address": "127.0.0.1"
+    }
+  ],
+  "allocation": {
+    "strategy": "first_fit",
+    "sort_by": "none",
+    "weight": "count",
+    "num_cores": 4,
+    "capacity": 0
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "subtasks": [
+        {
+          "id": 1,
+          "component_type": "source",
+          "core": 0,
+          "priority": 90,
+          "period_ns": 5000000,
+          "deadline_ns": 5000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 900000,
+          "benchmark": "busy900"
+        },
+        {
+          "id": 2,
+          "component_type": "intermediate",
+          "core": 0,
+          "priority": 90,
+          "period_ns": 5000000,
+          "deadline_ns": 5000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 3,
+          "component_type": "intermediate",
+          "core": 1,
+          "priority": 90,
+          "period_ns": 5000000,
+          "deadline_ns": 5000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 4,
+          "component_type": "intermediate",
+          "core": 2,
+          "priority": 90,
+          "period_ns": 5000000,
+          "deadline_ns": 5000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 5,
+          "component_type": "intermediate",
+          "core": 3,
+          "priority": 90,
+          "period_ns": 5000000,
+          "deadline_ns": 5000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 6,
+          "component_type": "sink",
+          "core": 0,
+          "priority": 90,
+          "period_ns": 5000000,
+          "deadline_ns": 5000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 900000,
+          "benchmark": "busy900"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "subtasks": [
+        {
+          "id": 7,
+          "component_type": "source",
+          "core": 1,
+          "priority": 60,
+          "period_ns": 10000000,
+          "deadline_ns": 10000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 900000,
+          "benchmark": "busy900"
+        },
+        {
+          "id": 8,
+          "component_type": "intermediate",
+          "core": 0,
+          "priority": 60,
+          "period_ns": 10000000,
+          "deadline_ns": 10000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 0,
+          "benchmark": ""
+        },
+        {
+          "id": 9,
+          "component_type": "intermediate",
+          "core": 1,
+          "priority": 60,
+          "period_ns": 10000000,
+          "deadline_ns": 10000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 10,
+          "component_type": "intermediate",
+          "core": 2,
+          "priority": 60,
+          "period_ns": 10000000,
+          "deadline_ns": 10000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 11,
+          "component_type": "intermediate",
+          "core": 3,
+          "priority": 60,
+          "period_ns": 10000000,
+          "deadline_ns": 10000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 12,
+          "component_type": "sink",
+          "core": 1,
+          "priority": 60,
+          "period_ns": 10000000,
+          "deadline_ns": 10000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "subtasks": [
+        {
+          "id": 13,
+          "component_type": "source",
+          "core": 2,
+          "priority": 30,
+          "period_ns": 20000000,
+          "deadline_ns": 20000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 900000,
+          "benchmark": "busy900"
+        },
+        {
+          "id": 14,
+          "component_type": "intermediate",
+          "core": 0,
+          "priority": 30,
+          "period_ns": 20000000,
+          "deadline_ns": 20000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 1800000,
+          "benchmark": "busy1800"
+        },
+        {
+          "id": 15,
+          "component_type": "intermediate",
+          "core": 1,
+          "priority": 30,
+          "period_ns": 20000000,
+          "deadline_ns": 20000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 900000,
+          "benchmark": "busy900"
+        },
+        {
+          "id": 16,
+          "component_type": "intermediate",
+          "core": 2,
+          "priority": 30,
+          "period_ns": 20000000,
+          "deadline_ns": 20000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 4500000,
+          "benchmark": "busy4500"
+        },
+        {
+          "id": 17,
+          "component_type": "intermediate",
+          "core": 3,
+          "priority": 30,
+          "period_ns": 20000000,
+          "deadline_ns": 20000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 3600000,
+          "benchmark": "busy3600"
+        },
+        {
+          "id": 18,
+          "component_type": "sink",
+          "core": 2,
+          "priority": 30,
+          "period_ns": 20000000,
+          "deadline_ns": 20000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 900000,
+          "benchmark": "busy900"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "upstream": 1,
+      "downstream": 2
+    },
+    {
+      "upstream": 1,
+      "downstream": 3
+    },
+    {
+      "upstream": 1,
+      "downstream": 4
+    },
+    {
+      "upstream": 1,
+      "downstream": 5
+    },
+    {
+      "upstream": 2,
+      "downstream": 6
+    },
+    {
+      "upstream": 3,
+      "downstream": 6
+    },
+    {
+      "upstream": 4,
+      "downstream": 6
+    },
+    {
+      "upstream": 5,
+      "downstream": 6
+    },
+    {
+      "upstream": 7,
+      "downstream": 8
+    },
+    {
+      "upstream": 7,
+      "downstream": 9
+    },
+    {
+      "upstream": 7,
+      "downstream": 10
+    },
+    {
+      "upstream": 7,
+      "downstream": 11
+    },
+    {
+      "upstream": 8,
+      "downstream": 12
+    },
+    {
+      "upstream": 9,
+      "downstream": 12
+    },
+    {
+      "upstream": 10,
+      "downstream": 12
+    },
+    {
+      "upstream": 11,
+      "downstream": 12
+    },
+    {
+      "upstream": 13,
+      "downstream": 14
+    },
+    {
+      "upstream": 13,
+      "downstream": 15
+    },
+    {
+      "upstream": 13,
+      "downstream": 16
+    },
+    {
+      "upstream": 13,
+      "downstream": 17
+    },
+    {
+      "upstream": 14,
+      "downstream": 18
+    },
+    {
+      "upstream": 15,
+      "downstream": 18
+    },
+    {
+      "upstream": 16,
+      "downstream": 18
+    },
+    {
+      "upstream": 17,
+      "downstream": 18
+    }
+  ]
+}

@@ -8,8 +8,8 @@
  *
  * Generic component semantics (demo):
  *   source       — increments a per-subtask counter
- *   intermediate — doubles its predecessor's value
- *   sink         — prints its predecessor's value
+ *   intermediate — sums all its predecessors' values, then doubles the total
+ *   sink         — prints the sum of all its predecessors' values
  *
  * The main thread fires source subtasks at their declared period_ns for
  * hyperperiods × LCM(all source periods), defaulting to 4.
@@ -82,19 +82,24 @@ int main(int argc, char* argv[]) {
                                     std::memory_order_relaxed);
                     });
             } else if (info.component_type == "intermediate") {
-                int pred = preds.at(id)[0];
+                std::vector<int> ups = preds.at(id);
                 subtask_ptrs[id] = std::make_unique<Subtask>(id,
-                    [v, id, pred] {
-                        v[id].store(v[pred].load(std::memory_order_relaxed) * 2.0,
-                                    std::memory_order_relaxed);
+                    [v, id, ups] {
+                        double sum = 0.0;
+                        for (int p : ups)
+                            sum += v[p].load(std::memory_order_relaxed);
+                        v[id].store(sum * 2.0, std::memory_order_relaxed);
                     });
             } else { // sink
-                int pred = preds.at(id)[0];
+                std::vector<int> ups = preds.at(id);
                 subtask_ptrs[id] = std::make_unique<Subtask>(id,
-                    [v, id, pred] {
+                    [id, v, ups] {
+                        double sum = 0.0;
+                        for (int p : ups)
+                            sum += v[p].load(std::memory_order_relaxed);
                         std::cout << "  [sink " << id << "] "
                                   << std::fixed << std::setprecision(0)
-                                  << v[pred].load(std::memory_order_relaxed) << "\n";
+                                  << sum << "\n";
                     });
             }
         }

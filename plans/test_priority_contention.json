@@ -1,0 +1,112 @@
+{
+  "hosts": [
+    {
+      "name": "localhost",
+      "address": "127.0.0.1"
+    }
+  ],
+  "allocation": {
+    "strategy": "first_fit",
+    "sort_by": "none",
+    "weight": "utilization",
+    "num_cores": 1,
+    "capacity": 0.0
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "subtasks": [
+        {
+          "id": 1,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 177971,
+          "benchmark": "whet"
+        },
+        {
+          "id": 2,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 177971,
+          "benchmark": "whet"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "subtasks": [
+        {
+          "id": 3,
+          "component_type": "source",
+          "priority": 10,
+          "period_ns": 50000000,
+          "deadline_ns": 50000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 177971,
+          "benchmark": "whet"
+        },
+        {
+          "id": 4,
+          "component_type": "sink",
+          "priority": 10,
+          "period_ns": 50000000,
+          "deadline_ns": 50000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 177971,
+          "benchmark": "whet"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "subtasks": [
+        {
+          "id": 5,
+          "component_type": "source",
+          "priority": 90,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "double",
+          "config": {},
+          "wcet_ns": 177971,
+          "benchmark": "whet"
+        },
+        {
+          "id": 6,
+          "component_type": "sink",
+          "priority": 90,
+          "period_ns": 2000000,
+          "deadline_ns": 2000000,
+          "output_type": "void",
+          "config": {},
+          "wcet_ns": 177971,
+          "benchmark": "whet"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "upstream": 1,
+      "downstream": 2
+    },
+    {
+      "upstream": 3,
+      "downstream": 4
+    },
+    {
+      "upstream": 5,
+      "downstream": 6
+    }
+  ]
+}

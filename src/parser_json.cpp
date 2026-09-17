@@ -1,8 +1,17 @@
 #include "parser_json.hpp"
 #include "allocator.hpp"
+#include "dag.hpp"
 
 
 using json = nlohmann::json;
+
+namespace {
+std::string expected_component_type(int fan_in, int fan_out) {
+    if (fan_in == 0)  return "source";
+    if (fan_out == 0) return "sink";
+    return "intermediate";
+}
+}
 
 DeploymentPlan JsonParser::parse(const std::string& filename){
     std::ifstream file(filename.c_str());
@@ -17,6 +26,8 @@ DeploymentPlan JsonParser::parse(const std::string& filename){
     plan.tasks       = parse_tasks(j);
     plan.connections = parse_connections(j);
     plan.allocation  = parse_allocation(j);
+
+    validate_dag(plan);
 
     bool needs_allocation = false;
     for (const auto& task : plan.tasks)
@@ -94,4 +105,32 @@ std::vector<ConnectionInfo> JsonParser::parse_connections(const json& j) {
         connections.push_back(connection);
     }
     return connections;
+}
+
+void JsonParser::validate_dag(const DeploymentPlan& plan) const {
+    DAG dag;
+    for (const auto& task : plan.tasks)
+        for (const auto& st : task.subtasks)
+            dag.add_node(st.id, nullptr);
+    for (const auto& c : plan.connections)
+        dag.add_edge(c.upstream, c.downstream);
+
+    try {
+        dag.topological_sort();
+    } catch (const std::runtime_error&) {
+        throw std::runtime_error(
+            "JsonParser::parse: plan connections form a cycle");
+    }
+
+    for (const auto& task : plan.tasks) {
+        for (const auto& st : task.subtasks) {
+            const std::string expected = expected_component_type(
+                dag.fan_in_count(st.id), dag.fan_out_count(st.id));
+            if (st.component_type != expected)
+                throw std::runtime_error(
+                    "JsonParser::parse: subtask " + std::to_string(st.id) +
+                    " is declared \"" + st.component_type + "\" but its "
+                    "connections make it \"" + expected + "\"");
+        }
+    }
 }

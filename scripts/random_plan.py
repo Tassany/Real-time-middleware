@@ -7,12 +7,21 @@ Usage:
     python3 scripts/random_plan.py --tasks 32 --seed 1 -o plan_random.json
     python3 scripts/random_plan.py --tasks 54 --min-subtasks 3 --max-subtasks 3
     python3 scripts/random_plan.py --platform pi4 --cores 3 --strategy worst_fit
+    python3 scripts/random_plan.py --platform x86 --benchmarks cover,prime,whet
+    python3 scripts/random_plan.py --branch-prob 0 -o plan_chain.json  # old linear chain
 
-Every task is a linear chain source -> intermediate* -> sink whose length is
-drawn from [--min-subtasks, --max-subtasks]. The period is drawn from the
---periods grid, the benchmark of each subtask is drawn from --benchmarks, and
-wcet_ns comes from the table of the selected platform. Priorities are
-rate-monotonic: the shortest period gets --prio-high, the longest --prio-low.
+Every task is a DAG of [--min-subtasks, --max-subtasks] nodes: a guaranteed
+0->1->...->(n-1) backbone (so there is always exactly one source and one
+sink) plus extra non-adjacent forward edges, each added independently with
+probability --branch-prob, which is where real fan-in/fan-out comes from.
+--branch-prob 0 collapses this to the plain linear chain source ->
+intermediate* -> sink used before DAG generation existed. component_type is
+assigned from the resulting topology (indegree 0 -> source, outdegree 0 ->
+sink, else intermediate), not from node position. The period is drawn from
+the --periods grid, the benchmark of each subtask is drawn from
+--benchmarks, and wcet_ns comes from the table of the selected platform.
+Priorities are rate-monotonic: the shortest period gets --prio-high, the
+longest --prio-low.
 
 The load is not a knob. You ask for N tasks and the script reports the
 utilization that came out, the same way allocate would.
@@ -45,6 +54,13 @@ MS = 1_000_000
 #
 # pi5 stays at six entries: there is no Pi 5 measurement anywhere in the repo
 # for the other 26, so --platform pi5 cannot use them.
+#
+# wcet_bench/cycle_counter_x86/resultados_pmu_x86.csv (media_ns column), x86_64
+# 24-core machine, SCHED_FIFO 80, mlockall, governor performance, core 3,
+# n=100, w=5. This is the mean WALL-TIME column (matching the pi4/pi5
+# convention above), not the perf_event_open cycle column that CSV also has.
+# x86 only carries the three benchmarks actually chosen as tasks so far; add
+# more from that CSV if another one is needed later.
 WCET_NS = {
     "pi5": {"matmult": 48050, "bsort100": 30310, "crc": 821,
             "ud": 789, "fft1": 746, "statemate": 207},
@@ -59,6 +75,7 @@ WCET_NS = {
         "insertsort": 597, "fibcall": 209, "fac": 175,
         "janne_complex": 140, "lcdnum": 131, "bs": 106,
     },
+    "x86": {"cover": 376, "prime": 1493, "whet": 177971},
 }
 
 # The period grid every hand-written plan in the repo uses.
@@ -78,9 +95,47 @@ def priority_map(periods_ms, hi, lo):
     return {p: int(round(hi - i * step)) for i, p in enumerate(uniq)}
 
 
-def chain_roles(n):
-    """Component types of a chain of n subtasks, first source and last sink."""
-    return ["source"] + ["intermediate"] * (n - 2) + ["sink"]
+def random_dag_edges(rng, n, branch_prob):
+    """Local edges (0-based, within a single task) for a DAG of n nodes.
+
+    Node i can only reach node j > i, so the result is acyclic by
+    construction. The i-1 -> i backbone guarantees a single connected
+    source (node 0) and sink (node n-1) even at branch_prob=0, where this
+    degenerates to the plain chain used before DAG generation existed.
+    Extra i -> j edges (j > i+1) are added independently with probability
+    branch_prob, producing real fan-in/fan-out.
+    """
+    edges = [(i - 1, i) for i in range(1, n)]
+    if branch_prob <= 0.0:
+        # No rng draws at all here, so seeded output is byte-identical to
+        # the plain chain generator this replaced.
+        return edges
+    for i in range(n):
+        for j in range(i + 2, n):
+            if rng.random() < branch_prob:
+                edges.append((i, j))
+    return edges
+
+
+def roles_from_edges(n, edges):
+    """component_type per node, derived from topology (not position):
+    indegree 0 -> source, outdegree 0 -> sink, else intermediate. A node
+    with both incoming and outgoing edges is "intermediate" even if it
+    also fans in or out."""
+    indeg = [0] * n
+    outdeg = [0] * n
+    for u, v in edges:
+        outdeg[u] += 1
+        indeg[v] += 1
+    roles = []
+    for i in range(n):
+        if indeg[i] == 0:
+            roles.append("source")
+        elif outdeg[i] == 0:
+            roles.append("sink")
+        else:
+            roles.append("intermediate")
+    return roles, indeg, outdeg
 
 
 def build_plan(rng, args):
@@ -90,14 +145,20 @@ def build_plan(rng, args):
 
     tasks, conns = [], []
     sid = tid = 1
+    fan_in_hist, fan_out_hist = collections.Counter(), collections.Counter()
 
     for _ in range(args.tasks):
         period_ms = rng.choice(args.periods)
         n = rng.randint(args.min_subtasks, args.max_subtasks)
         first = sid
 
+        edges = random_dag_edges(rng, n, args.branch_prob)
+        roles, indeg, outdeg = roles_from_edges(n, edges)
+        for d in indeg: fan_in_hist[d] += 1
+        for d in outdeg: fan_out_hist[d] += 1
+
         subtasks = []
-        for kind in chain_roles(n):
+        for kind in roles:
             name = rng.choice(args.benchmarks)
             subtasks.append({
                 "id": sid,
@@ -112,8 +173,8 @@ def build_plan(rng, args):
             })
             sid += 1
 
-        for i in range(n - 1):
-            conns.append({"upstream": first + i, "downstream": first + i + 1})
+        for u, v in edges:
+            conns.append({"upstream": first + u, "downstream": first + v})
 
         tasks.append({"id": tid, "subtasks": subtasks})
         tid += 1
@@ -130,10 +191,10 @@ def build_plan(rng, args):
         "tasks": tasks,
         "connections": conns,
     }
-    return plan, plan_stats(tasks, conns, args.cores)
+    return plan, plan_stats(tasks, conns, args.cores, fan_in_hist, fan_out_hist)
 
 
-def plan_stats(tasks, conns, num_cores):
+def plan_stats(tasks, conns, num_cores, fan_in_hist=None, fan_out_hist=None):
     """The load figures the allocator and evaluation actually react to."""
     all_st = [s for t in tasks for s in t["subtasks"]]
 
@@ -155,6 +216,10 @@ def plan_stats(tasks, conns, num_cores):
         "by_benchmark": collections.Counter(s["benchmark"] for s in all_st),
         "by_period_ms": collections.Counter(s["period_ns"] // MS for s in all_st),
         "by_length": collections.Counter(len(t["subtasks"]) for t in tasks),
+        # Degree histograms: {degree: how many nodes have it}. Any key >= 2
+        # here is a real DAG node (fan-in or fan-out), impossible in a chain.
+        "by_fan_in": fan_in_hist or collections.Counter(),
+        "by_fan_out": fan_out_hist or collections.Counter(),
     }
 
 
@@ -183,9 +248,14 @@ def main():
     ap.add_argument("--tasks", type=int, default=32,
                     help="number of tasks to generate (default: 32)")
     ap.add_argument("--min-subtasks", type=int, default=2,
-                    help="shortest chain, at least 2 (default: 2)")
+                    help="fewest DAG nodes per task, at least 2 (default: 2)")
     ap.add_argument("--max-subtasks", type=int, default=5,
-                    help="longest chain (default: 5)")
+                    help="most DAG nodes per task (default: 5)")
+    ap.add_argument("--branch-prob", type=float, default=0.25,
+                    help="probability of each extra non-adjacent forward edge "
+                         "beyond the i-1->i backbone, i.e. how branchy the "
+                         "generated DAG is; 0 reproduces the old linear chain "
+                         "exactly (default: 0.25)")
     ap.add_argument("--periods", default=",".join(str(p) for p in DEFAULT_PERIODS_MS),
                     help="comma-separated period grid in ms (default: 1,2,3,4,6,12)")
     ap.add_argument("--benchmarks", default=None,
@@ -224,6 +294,8 @@ def main():
                  "execute_plan.cpp and evaluation.cpp")
     if args.max_subtasks < args.min_subtasks:
         sys.exit("--max-subtasks must not be smaller than --min-subtasks")
+    if not 0.0 <= args.branch_prob <= 1.0:
+        sys.exit("--branch-prob must be between 0.0 and 1.0")
 
     try:
         args.periods = [int(p) for p in args.periods.split(",") if p.strip()]
@@ -266,14 +338,21 @@ def main():
     print(f"  tasks            {st['tasks']}")
     print(f"  subtasks         {st['subtasks']}")
     print(f"  edges            {st['edges']}")
+    print(f"  branch prob      {args.branch_prob:g}")
     print(f"  util total       {st['util_total']:.3f}")
     print(f"  util per core    {st['util_per_core']:.3f}  ({args.cores} cores)")
     print(f"  dispatches/ms    {st['dispatches_ms']:.1f}")
     print(f"  overhead budget  {st['overhead_budget_us']:.1f} us/job")
 
-    print("\n  chain length  tasks")
+    print("\n  DAG nodes  tasks")
     for n in sorted(st["by_length"]):
-        print(f"  {n:>12} {st['by_length'][n]:>6}")
+        print(f"  {n:>9} {st['by_length'][n]:>6}")
+
+    print("\n  fan-in  nodes    fan-out  nodes")
+    degrees = sorted(set(st["by_fan_in"]) | set(st["by_fan_out"]))
+    for d in degrees:
+        print(f"  {d:>6} {st['by_fan_in'][d]:>6}     "
+              f"{d:>6} {st['by_fan_out'][d]:>6}")
 
     print("\n  period_ms  prio  subtasks")
     for p in sorted(st["by_period_ms"]):

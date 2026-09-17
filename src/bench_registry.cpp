@@ -5,6 +5,7 @@
 #include <set>
 #include <stdexcept>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,25 @@ std::mutex mtx_bs, mtx_whet;
 void call_bs()   { serialized(mtx_bs,   [] { (void)bench_entry_bs(); }); }
 void call_whet() { serialized(mtx_whet, [] { (void)bench_entry_whet(); }); }
 
+// Spins on CLOCK_MONOTONIC until at least us microseconds have elapsed. No
+// shared state, so unlike the Malardalen benchmarks above these need no
+// per-name mutex: two subtasks calling the same busyN concurrently just spin
+// independently.
+void busy_wait_us(long us) {
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    const long target_ns = us * 1000L;
+    do {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+    } while ((now.tv_sec - start.tv_sec) * 1'000'000'000L
+             + (now.tv_nsec - start.tv_nsec) < target_ns);
+}
+
+void call_busy900()  { busy_wait_us(900); }
+void call_busy1800() { busy_wait_us(1800); }
+void call_busy3600() { busy_wait_us(3600); }
+void call_busy4500() { busy_wait_us(4500); }
+
 const std::map<std::string, bench::entry_fn>& table() {
     static const std::map<std::string, bench::entry_fn> t = {
         { "matmult",   &call_matmult   },
@@ -166,6 +186,11 @@ const std::map<std::string, bench::entry_fn>& table() {
 
         { "bs",   &call_bs   },
         { "whet", &call_whet },
+
+        { "busy900",  &call_busy900  },
+        { "busy1800", &call_busy1800 },
+        { "busy3600", &call_busy3600 },
+        { "busy4500", &call_busy4500 },
     };
     return t;
 }

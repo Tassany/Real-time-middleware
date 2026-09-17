@@ -1,0 +1,18 @@
+{
+  "hosts": [{"name": "localhost", "address": "127.0.0.1"}],
+  "allocation": {"strategy": "first_fit", "sort_by": "none", "weight": "count", "num_cores": 4, "capacity": 1},
+  "tasks": [
+    {"id": 1, "subtasks": [
+      {"id": 1, "component_type": "source",       "priority": 90, "period_ns": 100000000, "deadline_ns": 100000000, "output_type": "double", "config": {}, "wcet_ns": 1000, "benchmark": ""},
+      {"id": 2, "component_type": "intermediate",  "priority": 80, "period_ns": 100000000, "deadline_ns": 100000000, "output_type": "double", "config": {}, "wcet_ns": 1000, "benchmark": ""},
+      {"id": 3, "component_type": "intermediate",  "priority": 80, "period_ns": 100000000, "deadline_ns": 100000000, "output_type": "double", "config": {}, "wcet_ns": 1000, "benchmark": ""},
+      {"id": 4, "component_type": "sink",          "priority": 70, "period_ns": 100000000, "deadline_ns": 100000000, "output_type": "void",   "config": {}, "wcet_ns": 1000, "benchmark": ""}
+    ]}
+  ],
+  "connections": [
+    {"upstream": 1, "downstream": 2},
+    {"upstream": 1, "downstream": 3},
+    {"upstream": 2, "downstream": 4},
+    {"upstream": 3, "downstream": 4}
+  ]
+}

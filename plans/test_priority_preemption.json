@@ -1,0 +1,13 @@
+{
+  "hosts": [{"name": "localhost", "address": "127.0.0.1"}],
+  "allocation": {"strategy": "first_fit", "sort_by": "none", "weight": "count", "num_cores": 1, "capacity": 0},
+  "tasks": [
+    {"id": 1, "subtasks": [
+      {"id": 1, "component_type": "source", "core": 0, "priority": 90, "period_ns": 2000000, "deadline_ns": 2000000, "output_type": "double", "config": {}, "wcet_ns": 376, "benchmark": "cover"}
+    ]},
+    {"id": 2, "subtasks": [
+      {"id": 2, "component_type": "source", "core": 0, "priority": 10, "period_ns": 100000, "deadline_ns": 100000, "output_type": "double", "config": {}, "wcet_ns": 177971, "benchmark": "whet"}
+    ]}
+  ],
+  "connections": []
+}

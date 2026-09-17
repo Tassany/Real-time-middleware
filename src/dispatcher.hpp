@@ -9,7 +9,13 @@
  * ----------------------------------------
  * - Subtask carries period_ns / next_release_ns for periodic scheduling.
  * - Subtask carries an atomic in_processing flag (required by leader/followers).
- * - Subtask carries fan_in_total / fan_in_received for multi-supplier fan-in.
+ * - Subtask carries fan_in_mask / fan_in_mask_full for multi-supplier fan-in:
+ *   each predecessor is assigned a fixed bit (see SubtaskConn::supplier_bit),
+ *   so notify() ORs that bit in rather than incrementing a blind counter.
+ *   A plain counter cannot tell "two different suppliers signalled once
+ *   each" apart from "one supplier signalled twice", which a bitmask can —
+ *   this matters once a node has 2+ real predecessors racing on different
+ *   cores, not just the source nodes a linear chain ever had.
  * - Subtask carries a downstream list so the dispatcher can automatically
  *   notify successors after execution (no manual wiring in execute()).
  * - Dispatcher owns a min-heap timer_queue_ for deferred periodic subtasks.
@@ -37,7 +43,12 @@
 // PreemptiveDispatcher so SubtaskConn can hold either without casting.
 class IDispatcher {
 public:
-    virtual void notify(struct Subtask* s) = 0;
+    // supplier_bit identifies which predecessor is signalling (see
+    // SubtaskConn::supplier_bit); default of 1 (bit 0) is correct for the
+    // overwhelming majority of calls, where the target has a single
+    // supplier: sources ticked directly by TeamManager::notify, and any
+    // hand-built Subtask that never sets fan_in_mask_full beyond its default.
+    virtual void notify(struct Subtask* s, uint64_t supplier_bit = 1) = 0;
     virtual ~IDispatcher() = default;
 };
 
@@ -47,6 +58,10 @@ public:
 struct SubtaskConn {
     IDispatcher*    dispatcher;
     struct Subtask* subtask;
+    // Which bit of the target's fan_in_mask this edge sets. Distinct
+    // predecessors of the same subtask must use distinct bits (1, 2, 4, ...)
+    // — see TeamManager::initialize, which assigns them from the DAG.
+    uint64_t        supplier_bit = 1;
 };
 
 // -----------------------------------------------------------------------
@@ -65,9 +80,11 @@ struct Subtask {
     // Prevents concurrent execution when the leader/followers pattern is used.
     std::atomic<bool> in_processing{false};
 
-    // Fan-in: how many upstream suppliers must notify before we dispatch.
-    int              fan_in_total    = 1;  // default: single supplier
-    std::atomic<int> fan_in_received{0};
+    // Fan-in: bit i set in fan_in_mask_full means predecessor i must notify
+    // (with supplier_bit = 1 << i) before we dispatch. Default: single
+    // supplier at bit 0, so a plain notify(s) with no bit argument works.
+    uint64_t              fan_in_mask_full = 1;
+    std::atomic<uint64_t> fan_in_mask{0};
 
     // Successors to notify automatically after this subtask finishes.
     std::vector<SubtaskConn> downstream;
@@ -108,16 +125,21 @@ public:
     void register_subtask(Subtask* s) { subtasks_.push_back(s); }
 
     /**
-     * Signal that all preconditions for subtask s are met for one job.
+     * Signal that supplier_bit's precondition for subtask s is met for one
+     * job. Enqueues s only once every bit of fan_in_mask_full has been set.
      *
-     * Implements fan-in: increments fan_in_received; enqueues s only when
-     * all fan_in_total suppliers have signalled for this job.
+     * A bitmask (not a counter) is what makes this safe with 2+ real
+     * predecessors: OR-ing the same bit twice before the target fires is a
+     * no-op, so a supplier that (for whatever reason) signals twice for one
+     * job cannot be mistaken for two distinct suppliers each signalling
+     * once, the way a plain increment would.
      * Thread-safe; may be called from any thread.
      */
-    void notify(Subtask* s) override {
-        int received = s->fan_in_received.fetch_add(1) + 1;
-        if (received < s->fan_in_total) return;  // still waiting for more suppliers
-        s->fan_in_received.store(0);              // reset for the next job
+    void notify(Subtask* s, uint64_t supplier_bit = 1) override {
+        uint64_t mask = s->fan_in_mask.fetch_or(supplier_bit, std::memory_order_acq_rel)
+                       | supplier_bit;
+        if ((mask & s->fan_in_mask_full) != s->fan_in_mask_full) return; // still waiting
+        s->fan_in_mask.fetch_and(~s->fan_in_mask_full, std::memory_order_acq_rel);
 
         pthread_mutex_lock(&queue_mutex_);
         queue_.push(s);
@@ -211,7 +233,7 @@ public:
 
         // Step 5: propagate to downstream subtasks
         for (auto& conn : s->downstream)
-            conn.dispatcher->notify(conn.subtask);
+            conn.dispatcher->notify(conn.subtask, conn.supplier_bit);
 
         // Step 6: clear in_processing
         s->in_processing.store(false);
@@ -276,8 +298,12 @@ private:
             // Steps 2–6
             process_subtask(next);
 
-            // Paper step 5 continuation: drain remaining ready subtasks
-            while (true) {
+            // Paper step 5 continuation: drain remaining ready subtasks.
+            // Bounded by running_ so stop() doesn't have to wait out an
+            // overloaded dispatcher's whole backlog before pthread_join
+            // returns — it finishes the in-flight subtask and leaves the
+            // rest of the queue unprocessed, same as any other shutdown.
+            while (running_) {
                 pthread_mutex_lock(&queue_mutex_);
                 if (queue_.empty()) { pthread_mutex_unlock(&queue_mutex_); break; }
                 next = queue_.front();

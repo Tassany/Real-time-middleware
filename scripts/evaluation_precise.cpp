@@ -1,45 +1,31 @@
 /**
- * evaluation.cpp
+ * evaluation_precise.cpp
  *
- * Evaluates scheduling quality for each subtask in a deployment plan:
+ * Same instrumentation as evaluation.cpp (per-subtask Latency/Jitter and
+ * per-task end-to-end Response Time — see that file's header for the exact
+ * definitions, unchanged here), but with a different release mechanism.
  *
- *   Latency  = t_actual - t_scheduled
- *            = time the scheduler actually started the subtask
- *              minus the time it was supposed to start.
- *            Always >= 0 in a causal system. Lower is better.
+ * evaluation.cpp drives all sources off one shared tick counter: every
+ * min(all periods) it checks `tick % (period / min_p) == 0`. That division
+ * is exact only when every source period is a whole multiple of min_p ns.
+ * Rational Hz values rarely are (e.g. 1/70Hz = 14.2857...ms against a 5ms
+ * tick truncates to a ratio of 2, so the source actually fires every 10ms —
+ * a silent 30% shorter period, i.e. genuinely more load than the plan
+ * declares, not just a measurement quirk).
  *
- *   Jitter   = peak-to-peak variation of the latency across jobs of the same subtask.
- *            Reported as max_latency - min_latency (μs).
+ * This file instead gives each source its own absolute next-fire time
+ * (next_fire_ns += period_ns, exactly, every time — the same pattern
+ * Dispatcher::process_subtask already uses internally for next_release_ns)
+ * and always sleeps until whichever source is due next. No shared tick, no
+ * LCM, no rounding, for any combination of periods.
  *
- *   Response time (per task, not per subtask) = t_done - t_release
- *            t_release = the task's head subtask(s) scheduled tick boundary
- *                        (not the actual, possibly-jittered notify() call).
- *            t_done    = time the task's tail (sink) subtask finishes,
- *                        for the same job (matched FIFO via a per-task
- *                        release-time queue, since a task's own jobs
- *                        cannot complete out of order — the tail's fan-in
- *                        requires that job's own upstream subtasks first).
- *            This is end-to-end across the whole DAG, unlike the per-subtask
- *            Latency above, which only measures one subtask's own dispatch
- *            delay against its own period. Matches "response time" in
- *            Huang et al. 2012 (MCFlow), Table III.
- *
- * How the values are derived:
- *   The dispatcher runs step 4b BEFORE calling execute():
- *     s->next_release_ns += s->period_ns
- *   Therefore, inside execute():
- *     t_scheduled = s->next_release_ns - s->period_ns
- *     t_actual    = Dispatcher::monotonic_ns()  (captured at execute() entry)
- *     latency     = t_actual - t_scheduled
+ * Kept as a separate binary rather than folded into evaluation.cpp so the
+ * existing tick-based harness (already exercised by this project's other
+ * plans) stays exactly as it was.
  *
  * Usage:
- *   ./evaluation <plans/deployment_plan.json> [hyperperiods] [max_ticks]
- *   sudo ./evaluation ...    (enables SCHED_FIFO; cleaner measurements)
- *
- * max_ticks, when nonzero, is the exact tick count to run (overriding
- * hyperperiods*LCM either way — see the argc<2 usage message below for why
- * relying on hyperperiods alone can make a run take hours, or be too short
- * to sample, depending on the period set).
+ *   ./evaluation_precise <plans/deployment_plan.json> <duration_ms>
+ *   sudo ./evaluation_precise ...    (enables SCHED_FIFO; cleaner measurements)
  */
 
 #include <iostream>
@@ -65,7 +51,7 @@
 #include "bench_registry.hpp"
 
 // ---------------------------------------------------------------------------
-//  Per-subtask metrics
+//  Per-subtask metrics (identical to evaluation.cpp)
 // ---------------------------------------------------------------------------
 struct SubtaskMetrics {
     int      id          = 0;
@@ -73,30 +59,23 @@ struct SubtaskMetrics {
     uint64_t deadline_ns = 0;
     int      core        = 0;
     int      priority    = 0;
-
-    // One entry per job: t_actual - t_scheduled (nanoseconds)
     std::vector<int64_t> latency_ns;
-
-    int deadline_misses = 0; // jobs where latency > deadline_ns
+    int deadline_misses = 0;
 };
 
 // ---------------------------------------------------------------------------
-//  Per-task end-to-end response time (release of the head subtask to
-//  completion of the tail/sink subtask, same job). mtx guards the queue and
-//  vector below because the release side (main thread, in the tick loop)
-//  and the completion side (the sink's own dispatcher thread) run
-//  concurrently.
+//  Per-task end-to-end response time (identical to evaluation.cpp)
 // ---------------------------------------------------------------------------
 struct TaskMetrics {
     uint64_t deadline_ns = 0;
     std::mutex mtx;
-    std::deque<uint64_t> pending_release_ns; // FIFO: oldest unfinished job first
+    std::deque<uint64_t> pending_release_ns;
     std::vector<int64_t> response_ns;
     int deadline_misses = 0;
 };
 
 // ---------------------------------------------------------------------------
-//  Statistics helpers
+//  Statistics helpers (identical to evaluation.cpp)
 // ---------------------------------------------------------------------------
 static double ns_to_us(double ns) { return ns / 1000.0; }
 
@@ -107,7 +86,6 @@ static double mean(const std::vector<int64_t>& v) {
     return s / static_cast<double>(v.size());
 }
 
-// Peak-to-peak jitter: max - min
 static int64_t jitter(const std::vector<int64_t>& v) {
     if (v.size() < 2) return 0;
     auto [lo, hi] = std::minmax_element(v.begin(), v.end());
@@ -126,27 +104,16 @@ static int64_t vmax(const std::vector<int64_t>& v) {
 //  main
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <plans/deployment_plan.json> [hyperperiods] [max_ticks]\n"
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0] << " <plans/deployment_plan.json> <duration_ms>\n"
                   << "       sudo " << argv[0] << " ...  (for SCHED_FIFO)\n"
-                  << "  hyperperiods: number of hyperperiods to simulate (default 4)\n"
-                  << "  max_ticks: exact tick count to run instead of hyperperiods*LCM,\n"
-                  << "             0 = use hyperperiods*LCM as-is (default 0).\n"
-                  << "             Needed because hyperperiods multiplies the LCM of every\n"
-                  << "             source period: periods that don't share a small common\n"
-                  << "             multiple (e.g. 5ms and a 1/70Hz period) can make even one\n"
-                  << "             hyperperiod take hours, while others (e.g. a small exact\n"
-                  << "             ratio) finish in a handful of ticks. max_ticks fixes wall-\n"
-                  << "             clock run time directly so a sweep's points are comparable,\n"
-                  << "             at the cost of not finishing on an exact hyperperiod\n"
-                  << "             boundary.\n";
+                  << "  duration_ms: how long to run, wall-clock. Unlike evaluation.cpp\n"
+                  << "  there is no hyperperiods/LCM concept here — see this file's header.\n";
         return 1;
     }
 
-    // Number of hyperperiods to simulate; more => more ticks (longer run).
-    uint64_t hyperperiods = (argc > 2) ? std::strtoull(argv[2], nullptr, 10) : 4;
-    if (hyperperiods == 0) hyperperiods = 4;
-    uint64_t max_ticks = (argc > 3) ? std::strtoull(argv[3], nullptr, 10) : 0;
+    uint64_t duration_ms = std::strtoull(argv[2], nullptr, 10);
+    if (duration_ms == 0) { std::cerr << "duration_ms must be > 0\n"; return 1; }
 
     // -----------------------------------------------------------------------
     //  1. Parse deployment plan
@@ -175,33 +142,20 @@ int main(int argc, char* argv[]) {
     auto* v = vals_buf.get();
 
     // -----------------------------------------------------------------------
-    //  4. Tick loop parameters (needed before reserve())
+    //  4. Sources: one absolute next-fire time each, no shared tick/LCM.
     // -----------------------------------------------------------------------
-    std::vector<std::tuple<int, uint64_t, int>> sources; // {id, period_ns, task_id}
+    struct SourceSched {
+        int      id;
+        uint64_t period_ns;
+        int      task_id;
+        uint64_t next_fire_ns; // set once tm.start() has run, see section 9
+    };
+    std::vector<SourceSched> sources;
     for (auto& task : plan.tasks)
         for (auto& st : task.subtasks)
             if (preds.find(st.id) == preds.end())
-                sources.push_back({st.id, st.period_ns, st.task_id});
-
-    uint64_t min_p = std::get<1>(sources[0]);
-    for (auto& [id, p, tid] : sources) min_p = std::min(min_p, p);
-
-    uint64_t lcm_p = std::get<1>(sources[0]);
-    for (std::size_t i = 1; i < sources.size(); ++i)
-        lcm_p = std::lcm(lcm_p, std::get<1>(sources[i]));
-
-    // max_ticks, when given, is the tick count to run — not just an upper
-    // bound. A small one clamped only the too-big side would leave harmonic
-    // period sets (small natural hyperperiod, e.g. 4 ticks) running far
-    // shorter than requested while non-harmonic ones ran the full cap,
-    // defeating the point of asking for equal-duration runs across a sweep.
-    uint64_t ticks64 = hyperperiods * lcm_p / min_p;
-    if (max_ticks > 0 && ticks64 != max_ticks) {
-        std::cout << "Note: " << ticks64 << " ticks from " << hyperperiods
-                  << " hyperperiod(s) overridden to max_ticks=" << max_ticks << "\n";
-        ticks64 = max_ticks;
-    }
-    int ticks = static_cast<int>(ticks64);
+                sources.push_back({st.id, st.period_ns, st.task_id, 0});
+    if (sources.empty()) { std::cerr << "plan has no source subtasks\n"; return 1; }
 
     // -----------------------------------------------------------------------
     //  5. Phase 1 — allocate Subtask objects and pre-reserve metrics vectors
@@ -213,29 +167,20 @@ int main(int argc, char* argv[]) {
         for (auto& st : task.subtasks) {
             subtask_ptrs[st.id] = std::make_unique<Subtask>(st.id, []{});
 
-            auto& m     = mmap[st.id];
+            auto& m       = mmap[st.id];
             m.id          = st.id;
             m.period_ns   = st.period_ns;
             m.deadline_ns = st.deadline_ns;
             m.core        = st.core;
             m.priority    = st.priority;
 
-            // Max capacity = expected number of jobs for this period, derived
-            // from the (possibly capped) tick count actually being run, not
-            // the raw hyperperiods*lcm_p figure — that one can be huge even
-            // after capping ticks, and would reserve memory for jobs that
-            // will never happen.
             int cap = (st.period_ns > 0)
-                ? static_cast<int>(ticks64 / (st.period_ns / min_p)) + 4
-                : ticks + 4;
+                ? static_cast<int>(duration_ms * 1'000'000ULL / st.period_ns) + 4
+                : 4;
             m.latency_ns.reserve(cap);
         }
     }
 
-    // task_mmap is keyed by task_id, one entry per task; deadline_ns comes
-    // from that task's own sink subtask(s) (a task with no sink — e.g. a
-    // standalone periodic subtask with no downstream — just never gets
-    // anything pushed into its response_ns below, which is fine).
     std::map<int, TaskMetrics> task_mmap;
     for (auto& task : plan.tasks) {
         auto& tm_entry = task_mmap[task.id];
@@ -245,10 +190,7 @@ int main(int argc, char* argv[]) {
 
     // -----------------------------------------------------------------------
     //  6. Phase 2 — assign instrumented execute() lambdas
-    //
-    //  Two-phase pattern: the Subtask already lives on the heap (stable address),
-    //  so we can safely capture 's' as a raw pointer inside the lambda.
-    //  This lets us read s->next_release_ns and s->period_ns at execution time.
+    //  (identical to evaluation.cpp; see that file for the per-branch comments)
     // -----------------------------------------------------------------------
     for (auto& task : plan.tasks) {
         for (auto& info : task.subtasks) {
@@ -256,9 +198,6 @@ int main(int argc, char* argv[]) {
             Subtask*  s = subtask_ptrs.at(id).get();
             auto&     m = mmap.at(id);
 
-            // Real subtask body, when the plan names one. Resolved here so the
-            // lambda captures a plain function pointer and does no map lookup
-            // inside the real-time loop.
             bench::entry_fn body = info.benchmark.empty()
                                  ? nullptr
                                  : bench::lookup(info.benchmark);
@@ -333,8 +272,6 @@ int main(int argc, char* argv[]) {
                             ++m.deadline_misses;
                     }
 
-                    // End-to-end response time: pop this task's oldest
-                    // still-pending release (see task_mmap's mutex comment).
                     std::lock_guard<std::mutex> lk(tmet.mtx);
                     if (!tmet.pending_release_ns.empty()) {
                         uint64_t rel = tmet.pending_release_ns.front();
@@ -370,21 +307,16 @@ int main(int argc, char* argv[]) {
     TeamManager tm;
     tm.initialize(entries, dag);
 
-    std::cout << "=== Scheduling Evaluation: " << argv[1] << " ===\n"
+    std::cout << "=== Scheduling Evaluation (precise): " << argv[1] << " ===\n"
               << "Tasks: "         << plan.tasks.size()
               << "  Subtasks: "    << entries.size()
               << "  Dispatchers: " << tm.dispatcher_count() << "\n"
-              << "Tick: "          << min_p / 1'000'000ULL << " ms"
-              << "  LCM: "         << lcm_p / 1'000'000ULL << " ms"
-              << "  Ticks: "       << ticks
-              << "  (" << ticks * min_p / 1'000'000ULL << " ms)\n"
+              << "Duration: "      << duration_ms << " ms"
+              << "  Sources: "     << sources.size() << "\n"
               << "Collecting metrics (no output during run)...\n\n";
 
     // -----------------------------------------------------------------------
     //  8b. Warm up the benchmarks named by the plan
-    //
-    //  Outside the real-time loop, so the bsort100 page mapping and the crc
-    //  static table are paid for before the first job rather than by it.
     // -----------------------------------------------------------------------
     {
         std::set<std::string> names;
@@ -404,34 +336,35 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    //  9. Run
+    //  9. Run — each source sleeps to its own next_fire_ns and re-arms by
+    //  adding its exact period_ns, never a shared/truncated tick multiple.
     // -----------------------------------------------------------------------
     tm.start();
 
-    // Use absolute-time sleep so per-tick overshoots don't accumulate.
-    uint64_t next_tick_ns = Dispatcher::monotonic_ns() + min_p;
-    for (int tick = 1; tick <= ticks; ++tick) {
+    uint64_t now = Dispatcher::monotonic_ns();
+    for (auto& src : sources) src.next_fire_ns = now + src.period_ns;
+    uint64_t end_ns = now + duration_ms * 1'000'000ULL;
+
+    while (true) {
+        auto next = std::min_element(sources.begin(), sources.end(),
+            [](const SourceSched& a, const SourceSched& b) {
+                return a.next_fire_ns < b.next_fire_ns;
+            });
+        if (next->next_fire_ns > end_ns) break;
+
         struct timespec ts;
-        ts.tv_sec  = next_tick_ns / 1'000'000'000ULL;
-        ts.tv_nsec = next_tick_ns % 1'000'000'000ULL;
+        ts.tv_sec  = next->next_fire_ns / 1'000'000'000ULL;
+        ts.tv_nsec = next->next_fire_ns % 1'000'000'000ULL;
         clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
 
-        for (auto& [id, p, tid] : sources)
-            if (static_cast<uint64_t>(tick) % (p / min_p) == 0) {
-                // Release time for response-time tracking is the scheduled
-                // tick boundary, not whenever this loop actually gets here —
-                // consistent with how Latency above uses next_release_ns,
-                // not the wall-clock notify() call, as "when it should have
-                // started".
-                auto& tmet = task_mmap.at(tid);
-                {
-                    std::lock_guard<std::mutex> lk(tmet.mtx);
-                    tmet.pending_release_ns.push_back(next_tick_ns);
-                }
-                tm.notify(id);
-            }
+        auto& tmet = task_mmap.at(next->task_id);
+        {
+            std::lock_guard<std::mutex> lk(tmet.mtx);
+            tmet.pending_release_ns.push_back(next->next_fire_ns);
+        }
+        tm.notify(next->id);
 
-        next_tick_ns += min_p;
+        next->next_fire_ns += next->period_ns;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -455,7 +388,7 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    //  11. Report
+    //  11. Report — per-subtask latency (identical layout to evaluation.cpp)
     // -----------------------------------------------------------------------
     const int W = 16;
     std::cout << std::fixed << std::setprecision(3);
@@ -504,8 +437,6 @@ int main(int argc, char* argv[]) {
 
     // -----------------------------------------------------------------------
     //  12. Report — end-to-end response time per task
-    //  (tasks with no sink subtask show 0 jobs: nothing pushes into their
-    //  response_ns, since only a sink pops the release queue.)
     // -----------------------------------------------------------------------
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "\n=== End-to-end Response Time per Task ===\n";

@@ -16,6 +16,14 @@
 //  gcc -std=gnu89 -O0 -fno-builtin -fno-stack-protector, on a Raspberry Pi 5
 //  with the performance governor. Rebuilding these objects with a different -O
 //  level silently invalidates every plan.
+//
+//  Synthetic fixed-duration entries ("busy900", "busy1800", "busy3600",
+//  "busy4500") are not Malardalen benchmarks: they spin on CLOCK_MONOTONIC
+//  for exactly that many microseconds. They exist to reproduce workloads
+//  specified directly in microseconds (e.g. Huang et al. 2012 MCFlow, Table I)
+//  that do not correspond to any real benchmark's measured WCET. entry_fn
+//  takes no parameters, so each duration needed is its own named entry rather
+//  than one parameterized function.
 // ---------------------------------------------------------------------------
 namespace bench {
 
