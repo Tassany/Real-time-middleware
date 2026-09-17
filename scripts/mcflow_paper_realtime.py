@@ -26,6 +26,18 @@ generated in those two subtasks" for that cell.
 Usage:
     python3 scripts/mcflow_paper_realtime.py --low-hz 50
     python3 scripts/mcflow_paper_realtime.py --low-hz 90 -o plans/mcflow_paper_90hz.json
+    python3 scripts/mcflow_paper_realtime.py --low-hz 50 --isolate-tm
+
+--isolate-tm moves each task's Tm off the 3-subtask cluster Table I puts it
+in (Ts, T0 and Tm all share one core/Dispatcher thread) onto the core of one
+of the T1..T3 branches instead, splitting that 3-way share into two 2-way
+ones. Workload, priority and period are all unchanged — only which core Tm
+runs on. This exists because Table I's own layout makes Tm both (a) gated on
+the slowest of 4 parallel branches and (b) sharing a thread with Ts, the
+very thing that releases the next job — once (a) delays Tm even slightly,
+(b) means the next Ts queues up behind it too, and the backlog compounds
+instead of draining. Moving Tm off Ts's thread breaks that specific feedback
+loop without changing anything the paper's numbers are supposed to reflect.
 """
 
 import argparse
@@ -61,8 +73,16 @@ ROLE = {"Ts": "source", "T0": "intermediate", "T1": "intermediate",
 EDGES = [("Ts", "T0"), ("Ts", "T1"), ("Ts", "T2"), ("Ts", "T3"),
          ("T0", "Tm"), ("T1", "Tm"), ("T2", "Tm"), ("T3", "Tm")]
 
+# --isolate-tm: which core each task's Tm moves to instead of Ts's own.
+# Chosen so no (core, priority) dispatcher ends up with more than 2
+# subtasks (Table I's own layout puts 3 — Ts, T0 and Tm — on one), and so
+# the resulting core loads land close to even: at 50Hz this is
+# core0=0.81, core1=0.855, core2=0.81, core3=0.765 instead of Table I's
+# own 0.81/0.855/0.855/0.72 concentrated onto fewer, busier dispatchers.
+TM_ALT_CORE = {"High": 1, "Medium": 0, "Low": 3}
 
-def build_plan(low_hz):
+
+def build_plan(low_hz, isolate_tm=False):
     tasks, conns = [], []
     sid = tid = 1
 
@@ -75,13 +95,32 @@ def build_plan(low_hz):
         subtasks = []
         for label in ("Ts", "T0", "T1", "T2", "T3", "Tm"):
             core, us = spec["subtasks"][label]
+            if isolate_tm and label == "Tm":
+                core = TM_ALT_CORE[name]
             ids[label] = sid
+            # Only Ts is a genuinely periodic release — it has no
+            # predecessor, so it's the one subtask actually driven by an
+            # external clock. T0..T3 and Tm are purely reactive (fan-in
+            # triggered): they should run the instant their inputs are
+            # ready, not be rate-limited to "once per period". Giving them
+            # a nonzero period_ns activates process_subtask's release-guard
+            # deferral (dispatcher.hpp) for them too — if one is ever
+            # notified a hair earlier than its own period_ns clock expects
+            # (routine timing jitter, not an error), it gets pushed into
+            # the timer queue to wait for the lowest-priority idle thread,
+            # which only runs when its whole core goes fully idle. Once
+            # that happens once, the subtask's internal period_ns clock is
+            # permanently out of phase with when it's actually notified, so
+            # it keeps re-triggering the same deferral every cycle from
+            # then on — this, not priority or capacity, is what produced
+            # the runaway response times chased in this file's git history.
+            subtask_period_ns = period_ns if label == "Ts" else 0
             subtasks.append({
                 "id": sid,
                 "component_type": ROLE[label],
                 "core": core,
                 "priority": prio,
-                "period_ns": period_ns,
+                "period_ns": subtask_period_ns,
                 "deadline_ns": period_ns,  # implicit deadline, per the paper
                 "output_type": "double" if ROLE[label] != "sink" else "void",
                 "config": {},
@@ -117,9 +156,10 @@ def summarize(tasks):
     for t in tasks:
         hz = round(1e9 / t["subtasks"][0]["period_ns"])
         prio = t["subtasks"][0]["priority"]
+        labels = ("Ts", "T0", "T1", "T2", "T3", "Tm")
         by_label = ", ".join(
-            f"{label}=c{spec[0]}:{spec[1]}"
-            for label, spec in TABLE[t["name"]]["subtasks"].items())
+            f"{label}=c{s['core']}:{s['wcet_ns'] // US}"
+            for label, s in zip(labels, t["subtasks"]))
         print(f"  {t['name']:<7} {hz:<6} {prio:<9} {by_label}")
 
     print("\n  core  utilization (sum of wcet/period across all 3 tasks)")
@@ -137,14 +177,18 @@ def main():
     ap.add_argument("-o", "--output", default=None,
                      help="destination file (default: "
                           "plans/mcflow_paper_<low_hz>hz.json)")
+    ap.add_argument("--isolate-tm", action="store_true",
+                     help="move each task's Tm off Ts's core onto a branch "
+                          "core instead (see this file's header for why)")
     args = ap.parse_args()
 
     if args.low_hz <= 0:
         sys.exit("--low-hz must be greater than 0")
 
-    plan, tasks = build_plan(args.low_hz)
+    plan, tasks = build_plan(args.low_hz, isolate_tm=args.isolate_tm)
 
-    out = args.output or f"plans/mcflow_paper_{args.low_hz:g}hz.json"
+    suffix = "_isolatetm" if args.isolate_tm else ""
+    out = args.output or f"plans/mcflow_paper_{args.low_hz:g}hz{suffix}.json"
     with open(out, "w") as f:
         json.dump(plan, f, indent=2)
         f.write("\n")

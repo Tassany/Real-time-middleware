@@ -85,8 +85,8 @@ def parse_task_table(stdout):
     return result
 
 
-def run_point(low_hz, evaluate_bin, duration_ms, tmpdir):
-    plan, _ = paper.build_plan(low_hz)
+def run_point(low_hz, evaluate_bin, duration_ms, tmpdir, isolate_tm=False):
+    plan, _ = paper.build_plan(low_hz, isolate_tm=isolate_tm)
     plan_path = os.path.join(tmpdir, f"plan_{low_hz}hz.json")
     with open(plan_path, "w") as f:
         json.dump(plan, f)
@@ -111,6 +111,9 @@ def main():
                      help="wall-clock run length per point, same for all "
                           "five so the sweep is a fair comparison (default: "
                           "10000 = 10s per point, 50s total)")
+    ap.add_argument("--isolate-tm", action="store_true",
+                     help="build each point's plan with mcflow_paper_realtime's "
+                          "--isolate-tm layout instead of Table I's own")
     args = ap.parse_args()
 
     if not os.path.isfile(args.evaluate_bin) or not os.access(args.evaluate_bin, os.X_OK):
@@ -126,7 +129,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="mcflow_sweep_") as tmpdir:
         for hz in LOW_HZ_POINTS:
             print(f"running Low={hz}Hz ...", file=sys.stderr)
-            results[hz] = run_point(hz, args.evaluate_bin, args.duration_ms, tmpdir)
+            results[hz] = run_point(hz, args.evaluate_bin, args.duration_ms,
+                                     tmpdir, isolate_tm=args.isolate_tm)
 
     # --- Deadline miss ratio, side by side with Table II ---
     print("\n=== Deadline miss ratio (yours vs. Huang et al. 2012, Table II) ===")
